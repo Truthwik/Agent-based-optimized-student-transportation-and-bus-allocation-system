@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Stops | BVRIT Smart Bus</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="page-wrapper">
+        <nav class="navbar">
+            <div class="container">
+                <div class="navbar-brand">
+                    <div class="logo-icon">🛡️</div>
+                    BVRIT Admin
+                </div>
+                <ul class="navbar-links">
+                    <li><a href="/static/html/admin-dashboard.html">Dashboard</a></li>
+                    <li><a href="/static/html/manage-stops.html" class="active">Stops</a></li>
+                    <li><a href="/static/html/manage-buses.html">Buses</a></li>
+                    <li><a href="/static/html/students.html">Students</a></li>
+                    <li><a href="/static/html/generate-allocation.html">Allocate</a></li>
+                    <li><a href="/static/html/routes.html">Routes</a></li>
+                    <li><a href="#" class="btn-logout" onclick="logout()">Logout</a></li>
+                </ul>
+            </div>
+        </nav>
+
+        <div class="dashboard-content">
+            <div class="container">
+                <div class="page-header slide-up">
+                    <h1>📍 Manage Stops</h1>
+                    <p class="subtitle">Add, edit, or delete pickup stops</p>
+                </div>
+
+                <div id="alert" class="alert"></div>
+
+                <div class="toolbar slide-up">
+                    <div></div>
+                    <button class="btn btn-primary" onclick="showAddModal()">+ Add Stop</button>
+                </div>
+
+                <div class="glass-card slide-up" style="padding: 0;">
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Stop Name</th>
+                                    <th>Latitude</th>
+                                    <th>Longitude</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="stopsTable">
+                                <tr><td colspan="5" style="text-align:center;padding:40px;">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Modal -->
+    <div class="modal-overlay" id="modal">
+        <div class="modal">
+            <h2 id="modalTitle">Add Stop</h2>
+            <input type="hidden" id="editId">
+            <div class="form-group">
+                <label>Stop Name</label>
+                <input type="text" id="stopName" class="form-control" placeholder="e.g. Kukatpally" required>
+            </div>
+            <div class="form-group">
+                <label>Latitude</label>
+                <input type="number" step="any" id="latitude" class="form-control" placeholder="e.g. 17.4947" required>
+            </div>
+            <div class="form-group">
+                <label>Longitude</label>
+                <input type="number" step="any" id="longitude" class="form-control" placeholder="e.g. 78.3996" required>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="saveStop()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const token = localStorage.getItem('token');
+        if (!token || localStorage.getItem('role') !== 'admin') window.location.href = '/static/html/admin-login.html';
+        const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
+
+        async function loadStops() {
+            try {
+                const res = await fetch('/admin/stops', { headers });
+                const stops = await res.json();
+                const tbody = document.getElementById('stopsTable');
+
+                if (stops.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No stops added yet</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = stops.map(s => `
+                    <tr>
+                        <td>${s.stop_id}</td>
+                        <td><strong>${s.stop_name}</strong></td>
+                        <td>${s.latitude}</td>
+                        <td>${s.longitude}</td>
+                        <td>
+                            <div class="action-btns">
+                                <button class="btn btn-secondary btn-sm" onclick="editStop(${s.stop_id}, '${s.stop_name}', ${s.latitude}, ${s.longitude})">Edit</button>
+                                <button class="btn btn-danger btn-sm" onclick="deleteStop(${s.stop_id})">Delete</button>
+                            </div>
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (err) { console.error(err); }
+        }
+
+        function showAddModal() {
+            document.getElementById('modalTitle').textContent = 'Add Stop';
+            document.getElementById('editId').value = '';
+            document.getElementById('stopName').value = '';
+            document.getElementById('latitude').value = '';
+            document.getElementById('longitude').value = '';
+            document.getElementById('modal').classList.add('show');
+        }
+
+        function editStop(id, name, lat, lng) {
+            document.getElementById('modalTitle').textContent = 'Edit Stop';
+            document.getElementById('editId').value = id;
+            document.getElementById('stopName').value = name;
+            document.getElementById('latitude').value = lat;
+            document.getElementById('longitude').value = lng;
+            document.getElementById('modal').classList.add('show');
+        }
+
+        function closeModal() {
+            document.getElementById('modal').classList.remove('show');
+        }
+
+        async function saveStop() {
+            const id = document.getElementById('editId').value;
+            const body = {
+                stop_name: document.getElementById('stopName').value,
+                latitude: parseFloat(document.getElementById('latitude').value),
+                longitude: parseFloat(document.getElementById('longitude').value)
+            };
+            const alert = document.getElementById('alert');
+
+            try {
+                const url = id ? `/admin/stops/${id}` : '/admin/stops';
+                const method = id ? 'PUT' : 'POST';
+                const res = await fetch(url, { method, headers, body: JSON.stringify(body) });
+                const data = await res.json();
+
+                if (!res.ok) {
+                    alert.className = 'alert alert-error show';
+                    alert.textContent = data.detail || 'Error saving stop';
+                    return;
+                }
+
+                alert.className = 'alert alert-success show';
+                alert.textContent = id ? 'Stop updated!' : 'Stop added!';
+                closeModal();
+                loadStops();
+            } catch (err) {
+                alert.className = 'alert alert-error show';
+                alert.textContent = 'Connection error';
+            }
+        }
+
+        async function deleteStop(id) {
+            if (!confirm('Delete this stop?')) return;
+            const alert = document.getElementById('alert');
+
+            try {
+                const res = await fetch(`/admin/stops/${id}`, { method: 'DELETE', headers });
+                const data = await res.json();
+
+                if (!res.ok) {
+                    alert.className = 'alert alert-error show';
+                    alert.textContent = data.detail || 'Error deleting stop';
+                    return;
+                }
+
+                alert.className = 'alert alert-success show';
+                alert.textContent = 'Stop deleted!';
+                loadStops();
+            } catch (err) {
+                alert.className = 'alert alert-error show';
+                alert.textContent = 'Connection error';
+            }
+        }
+
+        function logout() { localStorage.clear(); window.location.href = '/static/html/admin-login.html'; }
+        loadStops();
+    </script>
+</body>
+</html>

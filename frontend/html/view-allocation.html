@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Allocation | BVRIT Smart Bus</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="page-wrapper">
+        <nav class="navbar">
+            <div class="container">
+                <div class="navbar-brand">
+                    <div class="logo-icon">🚌</div>
+                    BVRIT Smart Bus
+                </div>
+                <ul class="navbar-links">
+                    <li><a href="/static/html/dashboard.html">Dashboard</a></li>
+                    <li><a href="/static/html/select-stop.html">Select Stop</a></li>
+                    <li><a href="/static/html/view-allocation.html" class="active">My Allocation</a></li>
+                    <li><a href="/static/html/bus-pass.html">Bus Pass</a></li>
+                    <li><a href="#" class="btn-logout" onclick="logout()">Logout</a></li>
+                </ul>
+            </div>
+        </nav>
+
+        <div class="dashboard-content">
+            <div class="container">
+                <div class="page-header slide-up">
+                    <h1>🚍 My Bus Allocation</h1>
+                    <p class="subtitle">View your assigned bus and route details</p>
+                </div>
+
+                <div id="content">
+                    <div class="spinner"></div>
+                    <p class="loading-text">Loading allocation...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const token = localStorage.getItem('token');
+        if (!token || localStorage.getItem('role') !== 'student') window.location.href = '/static/html/login.html';
+
+        async function loadAllocation() {
+            const content = document.getElementById('content');
+            try {
+                const res = await fetch('/students/allocation', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (!res.ok) throw new Error('Failed');
+
+                const data = await res.json();
+
+                if (!data || !data.bus_number) {
+                    content.innerHTML = `
+                        <div class="empty-state glass-card">
+                            <div class="empty-icon">🔍</div>
+                            <h3>No Allocation Yet</h3>
+                            <p>Bus allocation has not been generated yet. Please check back later.</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                content.innerHTML = `
+                    <div class="glass-card slide-up" style="max-width: 700px;">
+                        <h3 style="margin-bottom: 24px;">✅ Bus Assigned</h3>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                            <div>
+                                <span style="color: var(--text-secondary); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;">Student Name</span>
+                                <p style="font-weight: 600; margin-top: 4px;">${data.student_name}</p>
+                            </div>
+                            <div>
+                                <span style="color: var(--text-secondary); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;">Roll Number</span>
+                                <p style="font-weight: 600; margin-top: 4px;">${data.student_id}</p>
+                            </div>
+                            <div>
+                                <span style="color: var(--text-secondary); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;">Branch</span>
+                                <p style="font-weight: 600; margin-top: 4px;">${data.branch}</p>
+                            </div>
+                            <div>
+                                <span style="color: var(--text-secondary); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;">Year</span>
+                                <p style="font-weight: 600; margin-top: 4px;">${data.year}</p>
+                            </div>
+                            <div>
+                                <span style="color: var(--text-secondary); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;">Pickup Stop</span>
+                                <p style="font-weight: 600; margin-top: 4px; color: var(--accent-cyan);">${data.stop_name}</p>
+                            </div>
+                            <div>
+                                <span style="color: var(--text-secondary); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;">Bus Number</span>
+                                <p style="font-weight: 600; margin-top: 4px; color: var(--accent-blue);">${data.bus_number}</p>
+                            </div>
+                            <div>
+                                <span style="color: var(--text-secondary); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;">Driver Name</span>
+                                <p style="font-weight: 600; margin-top: 4px;">${data.driver_name || 'N/A'}</p>
+                            </div>
+                            <div>
+                                <span style="color: var(--text-secondary); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px;">Driver Phone</span>
+                                <p style="font-weight: 600; margin-top: 4px;">${data.driver_phone || 'N/A'}</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } catch (err) {
+                content.innerHTML = `<div class="alert alert-error show">Failed to load allocation</div>`;
+            }
+        }
+
+        function logout() { localStorage.clear(); window.location.href = '/static/html/login.html'; }
+        loadAllocation();
+    </script>
+</body>
+</html>

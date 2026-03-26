@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Select Stop | BVRIT Smart Bus</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="page-wrapper">
+        <nav class="navbar">
+            <div class="container">
+                <div class="navbar-brand">
+                    <div class="logo-icon">🚌</div>
+                    BVRIT Smart Bus
+                </div>
+                <ul class="navbar-links">
+                    <li><a href="/static/html/dashboard.html">Dashboard</a></li>
+                    <li><a href="/static/html/select-stop.html" class="active">Select Stop</a></li>
+                    <li><a href="/static/html/view-allocation.html">My Allocation</a></li>
+                    <li><a href="/static/html/bus-pass.html">Bus Pass</a></li>
+                    <li><a href="#" class="btn-logout" onclick="logout()">Logout</a></li>
+                </ul>
+            </div>
+        </nav>
+
+        <div class="dashboard-content">
+            <div class="container">
+                <div class="page-header slide-up">
+                    <h1>📍 Select Your Pickup Stop</h1>
+                    <p class="subtitle">Choose whether you need bus service and select your pickup location</p>
+                </div>
+
+                <div id="alert" class="alert"></div>
+
+                <div class="glass-card slide-up" style="max-width: 600px;">
+                    <form id="stopForm">
+                        <div class="form-group">
+                            <label>Do you need bus service?</label>
+                            <select id="busRequired" class="form-control" onchange="toggleStopSelect()">
+                                <option value="">-- Select --</option>
+                                <option value="yes">Yes, I need bus service 🚌</option>
+                                <option value="no">No, I don't need bus service</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group" id="stopGroup" style="display: none;">
+                            <label>Select Pickup Stop</label>
+                            <select id="stopId" class="form-control">
+                                <option value="">-- Loading stops... --</option>
+                            </select>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary btn-block">Save Selection</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const token = localStorage.getItem('token');
+        if (!token || localStorage.getItem('role') !== 'student') window.location.href = '/static/html/login.html';
+
+        let stopsLoaded = false;
+
+        function toggleStopSelect() {
+            const val = document.getElementById('busRequired').value;
+            const group = document.getElementById('stopGroup');
+            group.style.display = val === 'yes' ? 'block' : 'none';
+            if (val === 'yes' && !stopsLoaded) loadStops();
+        }
+
+        async function loadStops() {
+            try {
+                const res = await fetch('/students/stops', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const stops = await res.json();
+                const sel = document.getElementById('stopId');
+                sel.innerHTML = '<option value="">-- Select a stop --</option>';
+                stops.forEach(s => {
+                    sel.innerHTML += `<option value="${s.stop_id}">${s.stop_name}</option>`;
+                });
+                stopsLoaded = true;
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        // Pre-load current selection
+        async function loadCurrent() {
+            try {
+                const res = await fetch('/students/me', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+                if (data.bus_required) {
+                    document.getElementById('busRequired').value = 'yes';
+                    toggleStopSelect();
+                    // Wait for stops to load, then set
+                    setTimeout(() => {
+                        document.getElementById('stopId').value = data.stop_id || '';
+                    }, 500);
+                } else if (data.bus_required === false && data.stop_id === null) {
+                    // Not set yet
+                } else {
+                    document.getElementById('busRequired').value = 'no';
+                }
+            } catch (err) {}
+        }
+
+        document.getElementById('stopForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const alert = document.getElementById('alert');
+            const busReq = document.getElementById('busRequired').value;
+
+            if (!busReq) {
+                alert.className = 'alert alert-error show';
+                alert.textContent = 'Please select an option';
+                return;
+            }
+
+            const body = { bus_required: busReq === 'yes' };
+            if (busReq === 'yes') {
+                const stopId = document.getElementById('stopId').value;
+                if (!stopId) {
+                    alert.className = 'alert alert-error show';
+                    alert.textContent = 'Please select a pickup stop';
+                    return;
+                }
+                body.stop_id = parseInt(stopId);
+            }
+
+            try {
+                const res = await fetch('/students/select-stop', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(body)
+                });
+
+                const data = await res.json();
+
+                if (!res.ok) {
+                    alert.className = 'alert alert-error show';
+                    alert.textContent = data.detail || 'Failed to save';
+                    return;
+                }
+
+                alert.className = 'alert alert-success show';
+                alert.textContent = '✅ Selection saved successfully!';
+            } catch (err) {
+                alert.className = 'alert alert-error show';
+                alert.textContent = 'Connection error';
+            }
+        });
+
+        function logout() { localStorage.clear(); window.location.href = '/static/html/login.html'; }
+        loadCurrent();
+    </script>
+</body>
+</html>

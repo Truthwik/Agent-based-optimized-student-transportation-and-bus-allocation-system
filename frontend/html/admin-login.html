@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Employee Login | BVRIT Smart Bus</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="auth-wrapper">
+        <div class="glass-card auth-card fade-in">
+            <div class="logo-icon-lg">🛡️</div>
+            <h1>Employee Portal</h1>
+            <p class="subtitle">BVRIT Smart Bus Management System</p>
+
+            <div id="alert" class="alert"></div>
+
+            <form id="loginForm">
+                <div class="form-group">
+                    <label>Employee Username</label>
+                    <input type="text" id="username" class="form-control" placeholder="employee id" required>
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="password" class="form-control" placeholder="Enter password" required>
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">Employee Sign In</button>
+            </form>
+
+            <p style="margin-top: 24px; font-size: 0.85rem; color: var(--text-muted)">
+                Student? <a href="/static/html/login.html">Login here</a>
+            </p>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const alert = document.getElementById('alert');
+            alert.className = 'alert';
+
+            try {
+                const res = await fetch('/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        username: document.getElementById('username').value.trim(),
+                        password: document.getElementById('password').value
+                    })
+                });
+                const data = await res.json();
+
+                if (!res.ok) {
+                    alert.className = 'alert alert-error show';
+                    alert.textContent = data.detail || 'Login failed';
+                    return;
+                }
+
+                if (data.role !== 'admin') {
+                    alert.className = 'alert alert-error show';
+                    alert.textContent = 'Please use the student login page';
+                    return;
+                }
+
+                localStorage.setItem('token', data.token);
+                localStorage.setItem('role', 'admin');
+                window.location.href = '/static/html/admin-dashboard.html';
+            } catch (err) {
+                alert.className = 'alert alert-error show';
+                alert.textContent = 'Connection error';
+            }
+        });
+    </script>
+</body>
+</html>

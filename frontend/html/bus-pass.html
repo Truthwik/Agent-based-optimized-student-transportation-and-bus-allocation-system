@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digital Bus Pass | BVRIT Smart Bus</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="page-wrapper">
+        <nav class="navbar">
+            <div class="container">
+                <div class="navbar-brand">
+                    <div class="logo-icon">🚌</div>
+                    BVRIT Smart Bus
+                </div>
+                <ul class="navbar-links">
+                    <li><a href="/static/html/dashboard.html">Dashboard</a></li>
+                    <li><a href="/static/html/select-stop.html">Select Stop</a></li>
+                    <li><a href="/static/html/view-allocation.html">My Allocation</a></li>
+                    <li><a href="/static/html/bus-pass.html" class="active">Bus Pass</a></li>
+                    <li><a href="#" class="btn-logout" onclick="logout()">Logout</a></li>
+                </ul>
+            </div>
+        </nav>
+
+        <div class="dashboard-content">
+            <div class="container">
+                <div class="page-header slide-up" style="text-align: center;">
+                    <h1>🎫 Digital Bus Pass</h1>
+                    <p class="subtitle">Your official BVRIT transportation pass</p>
+                </div>
+
+                <div id="passContent">
+                    <div class="spinner"></div>
+                    <p class="loading-text">Loading bus pass...</p>
+                </div>
+
+                <div style="text-align: center; margin-top: 24px;" id="printBtnContainer" style="display:none;">
+                    <button class="btn btn-secondary" onclick="window.print()">🖨️ Print Bus Pass</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const token = localStorage.getItem('token');
+        if (!token || localStorage.getItem('role') !== 'student') window.location.href = '/static/html/login.html';
+
+        async function loadPass() {
+            const content = document.getElementById('passContent');
+            try {
+                const res = await fetch('/students/bus-pass', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (!res.ok) throw new Error('Failed');
+
+                const data = await res.json();
+
+                if (!data || !data.bus_number) {
+                    content.innerHTML = `
+                        <div class="empty-state glass-card">
+                            <div class="empty-icon">🎫</div>
+                            <h3>Bus Pass Not Available</h3>
+                            <p>Bus allocation has not been generated yet. Your pass will appear here after allocation.</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                content.innerHTML = `
+                    <div class="bus-pass slide-up">
+                        <div class="pass-header">
+                            <h2>🚌 BVRIT Narsapur</h2>
+                            <div class="pass-subtitle">Smart Bus Pass — 2025-2026</div>
+                        </div>
+                        <div class="pass-details">
+                            <div class="pass-field">
+                                <label>Student Name</label>
+                                <span>${data.student_name}</span>
+                            </div>
+                            <div class="pass-field">
+                                <label>Roll Number</label>
+                                <span>${data.roll_number}</span>
+                            </div>
+                            <div class="pass-field">
+                                <label>Phone</label>
+                                <span>${data.phone || 'N/A'}</span>
+                            </div>
+                            <div class="pass-field">
+                                <label>Branch</label>
+                                <span>${data.branch}</span>
+                            </div>
+                            <div class="pass-field">
+                                <label>Year</label>
+                                <span>Year ${data.year}</span>
+                            </div>
+                            <div class="pass-field">
+                                <label>Pickup Stop</label>
+                                <span style="color: var(--accent-cyan);">${data.pickup_stop}</span>
+                            </div>
+                            <div class="pass-field">
+                                <label>Bus Number</label>
+                                <span style="color: var(--accent-blue);">${data.bus_number}</span>
+                            </div>
+                            <div class="pass-field">
+                                <label>Driver Name</label>
+                                <span>${data.driver_name || 'N/A'}</span>
+                            </div>
+                            <div class="pass-field">
+                                <label>Driver Phone</label>
+                                <span>${data.driver_phone || 'N/A'}</span>
+                            </div>
+                            <div class="pass-field">
+                                <label>Reporting Time</label>
+                                <span style="color: var(--accent-green);">${data.reporting_time}</span>
+                            </div>
+                        </div>
+                        <div class="pass-footer">
+                            BVRIT Narsapur — Smart Bus Management System<br>
+                            This is a digitally generated bus pass. Valid for AY 2025-2026.
+                        </div>
+                    </div>
+                `;
+                document.getElementById('printBtnContainer').style.display = 'block';
+            } catch (err) {
+                content.innerHTML = `<div class="alert alert-error show">Failed to load bus pass</div>`;
+            }
+        }
+
+        function logout() { localStorage.clear(); window.location.href = '/static/html/login.html'; }
+        loadPass();
+    </script>
+</body>
+</html>

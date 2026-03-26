@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Students | BVRIT Smart Bus</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="page-wrapper">
+        <nav class="navbar">
+            <div class="container">
+                <div class="navbar-brand">
+                    <div class="logo-icon">🛡️</div>
+                    BVRIT Admin
+                </div>
+                <ul class="navbar-links">
+                    <li><a href="/static/html/admin-dashboard.html">Dashboard</a></li>
+                    <li><a href="/static/html/manage-stops.html">Stops</a></li>
+                    <li><a href="/static/html/manage-buses.html">Buses</a></li>
+                    <li><a href="/static/html/students.html" class="active">Students</a></li>
+                    <li><a href="/static/html/generate-allocation.html">Allocate</a></li>
+                    <li><a href="/static/html/routes.html">Routes</a></li>
+                    <li><a href="#" class="btn-logout" onclick="logout()">Logout</a></li>
+                </ul>
+            </div>
+        </nav>
+
+        <div class="dashboard-content">
+            <div class="container">
+                <div class="page-header slide-up">
+                    <h1>👥 Student Data</h1>
+                    <p class="subtitle">View all registered students and their bus selections</p>
+                </div>
+
+                <div class="stats-grid slide-up" style="animation-delay: 0.1s;">
+                    <div class="stat-card">
+                        <div class="stat-icon cyan">👥</div>
+                        <div class="stat-value" id="totalCount">-</div>
+                        <div class="stat-label">Total Students</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon green">🚌</div>
+                        <div class="stat-value" id="busCount">-</div>
+                        <div class="stat-label">Need Bus</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon orange">📍</div>
+                        <div class="stat-value" id="stopCount">-</div>
+                        <div class="stat-label">Stop Selected</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon purple">✅</div>
+                        <div class="stat-value" id="allocCount">-</div>
+                        <div class="stat-label">Allocated</div>
+                    </div>
+                </div>
+
+                <div class="toolbar slide-up">
+                    <input type="text" id="searchInput" class="form-control search-input" placeholder="🔍 Search by ID, name, or branch..." oninput="filterTable()">
+                    <select id="filterBranch" class="form-control" style="max-width: 160px;" onchange="filterTable()">
+                        <option value="">All Branches</option>
+                        <option value="CSE">CSE</option>
+                        <option value="ECE">ECE</option>
+                        <option value="EEE">EEE</option>
+                        <option value="MECH">MECH</option>
+                        <option value="CIVIL">CIVIL</option>
+                    </select>
+                </div>
+
+                <div class="glass-card slide-up" style="padding: 0;">
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Student ID</th>
+                                    <th>Name</th>
+                                    <th>Branch</th>
+                                    <th>Year</th>
+                                    <th>Phone</th>
+                                    <th>Bus Service</th>
+                                    <th>Stop</th>
+                                    <th>Allocated Bus</th>
+                                </tr>
+                            </thead>
+                            <tbody id="studentsTable">
+                                <tr><td colspan="8" style="text-align:center;padding:40px;">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const token = localStorage.getItem('token');
+        if (!token || localStorage.getItem('role') !== 'admin') window.location.href = '/static/html/admin-login.html';
+        const headers = { 'Authorization': `Bearer ${token}` };
+
+        let allStudents = [];
+        let stopsMap = {};
+
+        async function loadData() {
+            try {
+                const [studentsRes, stopsRes] = await Promise.all([
+                    fetch('/admin/students', { headers }),
+                    fetch('/admin/stops', { headers })
+                ]);
+                allStudents = await studentsRes.json();
+                const stops = await stopsRes.json();
+                stops.forEach(s => stopsMap[s.stop_id] = s.stop_name);
+
+                document.getElementById('totalCount').textContent = allStudents.length;
+                document.getElementById('busCount').textContent = allStudents.filter(s => s.bus_required).length;
+                document.getElementById('stopCount').textContent = allStudents.filter(s => s.stop_id).length;
+                document.getElementById('allocCount').textContent = allStudents.filter(s => s.allocated_bus_id).length;
+
+                renderTable(allStudents);
+            } catch (err) { console.error(err); }
+        }
+
+        function renderTable(students) {
+            const tbody = document.getElementById('studentsTable');
+            if (students.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;">No students found</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = students.map(s => `
+                <tr>
+                    <td><strong>${s.student_id}</strong></td>
+                    <td>${s.name}</td>
+                    <td><span class="badge badge-info">${s.branch}</span></td>
+                    <td>${s.year}</td>
+                    <td>${s.phone || '-'}</td>
+                    <td>${s.bus_required ? '<span class="badge badge-success">Yes</span>' : '<span class="badge badge-warning">No</span>'}</td>
+                    <td>${s.stop_id ? stopsMap[s.stop_id] || `#${s.stop_id}` : '-'}</td>
+                    <td>${s.allocated_bus_id ? `<span class="badge badge-success">Bus #${s.allocated_bus_id}</span>` : '<span class="badge badge-warning">Pending</span>'}</td>
+                </tr>
+            `).join('');
+        }
+
+        function filterTable() {
+            const search = document.getElementById('searchInput').value.toLowerCase();
+            const branch = document.getElementById('filterBranch').value;
+
+            let filtered = allStudents;
+            if (search) {
+                filtered = filtered.filter(s =>
+                    s.student_id.toLowerCase().includes(search) ||
+                    s.name.toLowerCase().includes(search) ||
+                    s.branch.toLowerCase().includes(search)
+                );
+            }
+            if (branch) {
+                filtered = filtered.filter(s => s.branch === branch);
+            }
+            renderTable(filtered);
+        }
+
+        function logout() { localStorage.clear(); window.location.href = '/static/html/admin-login.html'; }
+        loadData();
+    </script>
+</body>
+</html>

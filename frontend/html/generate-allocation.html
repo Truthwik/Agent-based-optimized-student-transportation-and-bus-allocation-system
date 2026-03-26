@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generate Allocation | BVRIT Smart Bus</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="page-wrapper">
+        <nav class="navbar">
+            <div class="container">
+                <div class="navbar-brand">
+                    <div class="logo-icon">🛡️</div>
+                    BVRIT Admin
+                </div>
+                <ul class="navbar-links">
+                    <li><a href="/static/html/admin-dashboard.html">Dashboard</a></li>
+                    <li><a href="/static/html/manage-stops.html">Stops</a></li>
+                    <li><a href="/static/html/manage-buses.html">Buses</a></li>
+                    <li><a href="/static/html/students.html">Students</a></li>
+                    <li><a href="/static/html/generate-allocation.html" class="active">Allocate</a></li>
+                    <li><a href="/static/html/routes.html">Routes</a></li>
+                    <li><a href="#" class="btn-logout" onclick="logout()">Logout</a></li>
+                </ul>
+            </div>
+        </nav>
+
+        <div class="dashboard-content">
+            <div class="container">
+                <div class="page-header slide-up">
+                    <h1>⚡ Generate Bus Allocation</h1>
+                    <p class="subtitle">Run the optimizer to assign students to buses based on stops and routes</p>
+                </div>
+
+                <div id="alert" class="alert"></div>
+
+                <!-- Pre-check -->
+                <div class="glass-card slide-up" style="margin-bottom: 24px;">
+                    <h3 style="margin-bottom: 16px;">📋 Pre-Allocation Check</h3>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+                        <div>
+                            <span style="color: var(--text-secondary); font-size: 0.85rem;">Students Need Bus</span>
+                            <p id="needBus" style="font-weight: 700; font-size: 1.3rem; margin-top: 4px;">-</p>
+                        </div>
+                        <div>
+                            <span style="color: var(--text-secondary); font-size: 0.85rem;">Stops with Students</span>
+                            <p id="stopsWithStudents" style="font-weight: 700; font-size: 1.3rem; margin-top: 4px;">-</p>
+                        </div>
+                        <div>
+                            <span style="color: var(--text-secondary); font-size: 0.85rem;">Available Buses</span>
+                            <p id="availBuses" style="font-weight: 700; font-size: 1.3rem; margin-top: 4px;">-</p>
+                        </div>
+                        <div>
+                            <span style="color: var(--text-secondary); font-size: 0.85rem;">Total Bus Capacity</span>
+                            <p id="totalCapacity" style="font-weight: 700; font-size: 1.3rem; margin-top: 4px;">-</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="text-align: center; margin-bottom: 32px;" class="slide-up">
+                    <button id="generateBtn" class="btn btn-primary" style="padding: 16px 48px; font-size: 1.1rem;" onclick="generate()">
+                        ⚡ Generate Bus Allocation
+                    </button>
+                    <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 12px;">
+                        ⚠️ This will clear any existing allocations and regenerate from scratch
+                    </p>
+                </div>
+
+                <!-- Results -->
+                <div id="results" style="display: none;">
+                    <div class="glass-card slide-up" style="margin-bottom: 24px;">
+                        <h3 style="margin-bottom: 16px;">✅ Allocation Results</h3>
+                        <p id="resultMessage" style="color: var(--accent-green); font-weight: 600; margin-bottom: 16px;"></p>
+
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 24px;">
+                            <div>
+                                <span style="color: var(--text-secondary); font-size: 0.85rem;">Routes Generated</span>
+                                <p id="routeCount" style="font-weight: 700; font-size: 1.5rem; margin-top: 4px; color: var(--accent-blue);"></p>
+                            </div>
+                            <div>
+                                <span style="color: var(--text-secondary); font-size: 0.85rem;">Students Allocated</span>
+                                <p id="allocatedCount" style="font-weight: 700; font-size: 1.5rem; margin-top: 4px; color: var(--accent-green);"></p>
+                            </div>
+                            <div>
+                                <span style="color: var(--text-secondary); font-size: 0.85rem;">Unassigned</span>
+                                <p id="unassignedCount" style="font-weight: 700; font-size: 1.5rem; margin-top: 4px; color: var(--accent-orange);"></p>
+                            </div>
+                        </div>
+
+                        <!-- Routes Table -->
+                        <div id="routesResult"></div>
+                    </div>
+
+                    <!-- Unassigned Stops -->
+                    <div id="unassignedSection" style="display: none;">
+                        <div class="glass-card" style="border-color: rgba(255,145,0,0.3);">
+                            <h3 style="margin-bottom: 16px; color: var(--accent-orange);">⚠️ Unassigned Stops</h3>
+                            <p style="color: var(--text-secondary); margin-bottom: 16px;">These stops could not be covered with existing buses. Consider adding more buses.</p>
+                            <div id="unassignedList"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const token = localStorage.getItem('token');
+        if (!token || localStorage.getItem('role') !== 'admin') window.location.href = '/static/html/admin-login.html';
+        const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
+
+        async function loadPreCheck() {
+            try {
+                const [studentsRes, stopsRes, busesRes] = await Promise.all([
+                    fetch('/admin/students', { headers }),
+                    fetch('/admin/stops', { headers }),
+                    fetch('/admin/buses', { headers })
+                ]);
+
+                const students = await studentsRes.json();
+                const stops = await stopsRes.json();
+                const buses = await busesRes.json();
+
+                const needBus = students.filter(s => s.bus_required && s.stop_id);
+                const stopsWithStudents = [...new Set(needBus.map(s => s.stop_id))];
+
+                document.getElementById('needBus').textContent = needBus.length;
+                document.getElementById('stopsWithStudents').textContent = stopsWithStudents.length;
+                document.getElementById('availBuses').textContent = buses.length;
+                document.getElementById('totalCapacity').textContent = buses.reduce((sum, b) => sum + b.capacity, 0);
+            } catch (err) { console.error(err); }
+        }
+
+        async function generate() {
+            const btn = document.getElementById('generateBtn');
+            const alert = document.getElementById('alert');
+            btn.disabled = true;
+            btn.innerHTML = '<div class="spinner" style="width:20px;height:20px;margin:0;border-width:2px;"></div> Generating...';
+            alert.className = 'alert';
+
+            try {
+                const res = await fetch('/admin/generate-allocation', {
+                    method: 'POST',
+                    headers
+                });
+
+                const data = await res.json();
+                btn.disabled = false;
+                btn.innerHTML = '⚡ Generate Bus Allocation';
+
+                if (!res.ok) {
+                    alert.className = 'alert alert-error show';
+                    alert.textContent = data.detail || 'Error generating allocation';
+                    return;
+                }
+
+                // Show results
+                document.getElementById('results').style.display = 'block';
+                document.getElementById('resultMessage').textContent = data.message;
+                document.getElementById('routeCount').textContent = data.routes ? data.routes.length : 0;
+                document.getElementById('allocatedCount').textContent = data.total_students_allocated || 0;
+                document.getElementById('unassignedCount').textContent = data.total_students_unassigned || 0;
+
+                // Routes table
+                if (data.routes && data.routes.length > 0) {
+                    let html = '';
+                    data.routes.forEach((r, i) => {
+                        const utilClass = r.utilization >= 75 ? 'good' : r.utilization >= 50 ? 'warning' : 'danger';
+                        html += `
+                            <div class="route-card">
+                                <div class="route-header">
+                                    <div>
+                                        <h3 style="margin-bottom: 2px;">🚌 ${r.bus_number}</h3>
+                                        <span style="font-size: 0.85rem; color: var(--text-secondary);">${r.students}/${r.capacity} students (${r.utilization}%)</span>
+                                    </div>
+                                    <span class="badge ${utilClass === 'good' ? 'badge-success' : utilClass === 'warning' ? 'badge-warning' : 'badge-danger'}">
+                                        ${r.utilization}% Full
+                                    </span>
+                                </div>
+                                <div class="route-stops">
+                                    ${r.stops.map((s, j) => `<span class="route-stop-pill">${s}</span>${j < r.stops.length - 1 ? '<span class="route-arrow">→</span>' : ''}`).join('')}
+                                    <span class="route-arrow">→</span>
+                                    <span class="route-stop-pill" style="background: rgba(0,230,118,0.1); border-color: rgba(0,230,118,0.2); color: var(--accent-green);">🏫 BVRIT Campus</span>
+                                </div>
+                                <div class="utilization-bar">
+                                    <div class="fill ${utilClass}" style="width: ${r.utilization}%"></div>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    document.getElementById('routesResult').innerHTML = html;
+                }
+
+                // Unassigned stops
+                if (data.unassigned_stops && data.unassigned_stops.length > 0) {
+                    document.getElementById('unassignedSection').style.display = 'block';
+                    document.getElementById('unassignedList').innerHTML = data.unassigned_stops.map(u => `
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; background: rgba(255,145,0,0.05); border-radius: 10px; margin-bottom: 8px;">
+                            <div>
+                                <strong>${u.stop_name}</strong>
+                                <span style="color: var(--text-secondary); margin-left: 8px;">${u.students} students</span>
+                            </div>
+                            <span class="badge badge-warning">${u.suggestion}</span>
+                        </div>
+                    `).join('');
+                }
+
+                alert.className = 'alert alert-success show';
+                alert.textContent = '✅ Allocation generated successfully!';
+                loadPreCheck();
+            } catch (err) {
+                btn.disabled = false;
+                btn.innerHTML = '⚡ Generate Bus Allocation';
+                alert.className = 'alert alert-error show';
+                alert.textContent = 'Connection error';
+            }
+        }
+
+        function logout() { localStorage.clear(); window.location.href = '/static/html/admin-login.html'; }
+        loadPreCheck();
+    </script>
+</body>
+</html>

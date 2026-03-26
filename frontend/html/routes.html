@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Routes | BVRIT Smart Bus</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="page-wrapper">
+        <nav class="navbar">
+            <div class="container">
+                <div class="navbar-brand">
+                    <div class="logo-icon">🛡️</div>
+                    BVRIT Admin
+                </div>
+                <ul class="navbar-links">
+                    <li><a href="/static/html/admin-dashboard.html">Dashboard</a></li>
+                    <li><a href="/static/html/manage-stops.html">Stops</a></li>
+                    <li><a href="/static/html/manage-buses.html">Buses</a></li>
+                    <li><a href="/static/html/students.html">Students</a></li>
+                    <li><a href="/static/html/generate-allocation.html">Allocate</a></li>
+                    <li><a href="/static/html/routes.html" class="active">Routes</a></li>
+                    <li><a href="#" class="btn-logout" onclick="logout()">Logout</a></li>
+                </ul>
+            </div>
+        </nav>
+
+        <div class="dashboard-content">
+            <div class="container">
+                <div class="page-header slide-up">
+                    <h1>🗺️ Generated Routes</h1>
+                    <p class="subtitle">View all bus routes with stop ordering</p>
+                </div>
+
+                <div id="content">
+                    <div class="spinner"></div>
+                    <p class="loading-text">Loading routes...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const token = localStorage.getItem('token');
+        if (!token || localStorage.getItem('role') !== 'admin') window.location.href = '/static/html/admin-login.html';
+        const headers = { 'Authorization': `Bearer ${token}` };
+
+        async function loadRoutes() {
+            const content = document.getElementById('content');
+            try {
+                const res = await fetch('/admin/routes', { headers });
+                const routes = await res.json();
+
+                if (!routes || routes.length === 0) {
+                    content.innerHTML = `
+                        <div class="empty-state glass-card">
+                            <div class="empty-icon">🗺️</div>
+                            <h3>No Routes Generated</h3>
+                            <p>Run the allocation optimizer first to generate routes.</p>
+                            <a href="/static/html/generate-allocation.html" class="btn btn-primary" style="margin-top: 16px;">Go to Allocation</a>
+                        </div>
+                    `;
+                    return;
+                }
+
+                let html = `
+                    <div class="stats-grid slide-up" style="margin-bottom: 24px;">
+                        <div class="stat-card">
+                            <div class="stat-icon blue">🗺️</div>
+                            <div class="stat-value">${routes.length}</div>
+                            <div class="stat-label">Total Routes</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon green">👥</div>
+                            <div class="stat-value">${routes.reduce((s, r) => s + r.total_students, 0)}</div>
+                            <div class="stat-label">Students Covered</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon purple">📍</div>
+                            <div class="stat-value">${routes.reduce((s, r) => s + r.total_stops, 0)}</div>
+                            <div class="stat-label">Stops Covered</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon orange" style="background: rgba(255, 152, 0, 0.1); color: #ff9800;">📏</div>
+                            <div class="stat-value">${routes.reduce((s, r) => s + r.total_distance, 0).toFixed(1)} <span style="font-size:1rem;">km</span></div>
+                            <div class="stat-label">Total Distance</div>
+                        </div>
+                    </div>
+                `;
+
+                routes.forEach(route => {
+                    html += `
+                        <div class="route-card slide-up">
+                            <div class="route-header">
+                                <div>
+                                    <h3 style="margin-bottom: 2px;">🚌 ${route.bus_number}</h3>
+                                    <span style="font-size: 0.85rem; color: var(--text-secondary);">
+                                        Route #${route.route_id} · ${route.total_students} students · ${route.total_stops} stops · ${(route.total_distance || 0).toFixed(1)} km
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="route-stops">
+                                ${route.stops.map((s, i) => `
+                                    <span class="route-stop-pill">
+                                        <strong style="margin-right: 4px;">${s.stop_order}.</strong> ${s.stop_name}
+                                    </span>
+                                    ${i < route.stops.length - 1 ? '<span class="route-arrow">→</span>' : ''}
+                                `).join('')}
+                                <span class="route-arrow">→</span>
+                                <span class="route-stop-pill" style="background: rgba(0,230,118,0.1); border-color: rgba(0,230,118,0.2); color: var(--accent-green);">
+                                    🏫 BVRIT Campus
+                                </span>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                content.innerHTML = html;
+            } catch (err) {
+                content.innerHTML = `<div class="alert alert-error show">Failed to load routes</div>`;
+            }
+        }
+
+        function logout() { localStorage.clear(); window.location.href = '/static/html/admin-login.html'; }
+        loadRoutes();
+    </script>
+</body>
+</html>

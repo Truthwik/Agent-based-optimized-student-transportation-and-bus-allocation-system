@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Environment variables
+.env
+
+# IDE
+.vscode/
+.idea/
+
+# Pyre
+.pyre/
+.pyre_configuration
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Misc
+*.log
+fix_pyre.py

@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard | BVRIT Smart Bus</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="page-wrapper">
+        <!-- Navbar -->
+        <nav class="navbar">
+            <div class="container">
+                <div class="navbar-brand">
+                    <div class="logo-icon">🚌</div>
+                    BVRIT Smart Bus
+                </div>
+                <ul class="navbar-links">
+                    <li><a href="/static/html/dashboard.html" class="active">Dashboard</a></li>
+                    <li><a href="/static/html/select-stop.html">Select Stop</a></li>
+                    <li><a href="/static/html/view-allocation.html">My Allocation</a></li>
+                    <li><a href="/static/html/bus-pass.html">Bus Pass</a></li>
+                    <li><a href="#" class="btn-logout" onclick="logout()">Logout</a></li>
+                </ul>
+            </div>
+        </nav>
+
+        <!-- Content -->
+        <div class="dashboard-content">
+            <div class="container">
+                <div class="page-header slide-up">
+                    <h1>Welcome back, <span id="studentName">Student</span> 👋</h1>
+                    <p class="subtitle">Manage your bus service and view allocations</p>
+                </div>
+
+                <div class="cards-grid slide-up" style="animation-delay: 0.1s;">
+                    <a href="/static/html/select-stop.html" class="nav-card">
+                        <div class="card-icon">📍</div>
+                        <h3>Select Pickup Stop</h3>
+                        <p>Choose your bus service preference and pickup location</p>
+                    </a>
+                    <a href="/static/html/view-allocation.html" class="nav-card">
+                        <div class="card-icon">🚍</div>
+                        <h3>View Allocation</h3>
+                        <p>See your assigned bus, route, and driver details</p>
+                    </a>
+                    <a href="/static/html/bus-pass.html" class="nav-card">
+                        <div class="card-icon">🎫</div>
+                        <h3>Digital Bus Pass</h3>
+                        <p>View and download your digital bus pass</p>
+                    </a>
+                </div>
+
+                <!-- Status Card -->
+                <div class="glass-card slide-up" style="animation-delay: 0.2s;">
+                    <h3 style="margin-bottom: 16px;">📋 Your Status</h3>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+                        <div>
+                            <span style="color: var(--text-secondary); font-size: 0.85rem;">Bus Service</span>
+                            <p id="busStatus" style="font-weight: 600; margin-top: 4px;">-</p>
+                        </div>
+                        <div>
+                            <span style="color: var(--text-secondary); font-size: 0.85rem;">Pickup Stop</span>
+                            <p id="stopStatus" style="font-weight: 600; margin-top: 4px;">-</p>
+                        </div>
+                        <div>
+                            <span style="color: var(--text-secondary); font-size: 0.85rem;">Allocated Bus</span>
+                            <p id="busAlloc" style="font-weight: 600; margin-top: 4px;">-</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const token = localStorage.getItem('token');
+        if (!token || localStorage.getItem('role') !== 'student') {
+            window.location.href = '/static/html/login.html';
+        }
+
+        async function loadProfile() {
+            try {
+                const res = await fetch('/students/me', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!res.ok) throw new Error('Unauthorized');
+                const data = await res.json();
+
+                document.getElementById('studentName').textContent = data.name;
+                document.getElementById('busStatus').innerHTML = data.bus_required
+                    ? '<span class="badge badge-success">Active</span>'
+                    : '<span class="badge badge-warning">Not Selected</span>';
+                document.getElementById('stopStatus').textContent = data.stop_id ? `Stop #${data.stop_id}` : 'Not selected';
+                document.getElementById('busAlloc').textContent = data.allocated_bus_id ? `Bus #${data.allocated_bus_id}` : 'Pending';
+
+                // Load stop name if available
+                if (data.stop_id) {
+                    const stopsRes = await fetch('/students/stops', {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    if (stopsRes.ok) {
+                        const stops = await stopsRes.json();
+                        const stop = stops.find(s => s.stop_id === data.stop_id);
+                        if (stop) document.getElementById('stopStatus').textContent = stop.stop_name;
+                    }
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        function logout() {
+            localStorage.clear();
+            window.location.href = '/static/html/login.html';
+        }
+
+        loadProfile();
+    </script>
+</body>
+</html>

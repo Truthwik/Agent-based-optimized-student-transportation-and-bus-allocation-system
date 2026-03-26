@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Buses | BVRIT Smart Bus</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="page-wrapper">
+        <nav class="navbar">
+            <div class="container">
+                <div class="navbar-brand">
+                    <div class="logo-icon">🛡️</div>
+                    BVRIT Admin
+                </div>
+                <ul class="navbar-links">
+                    <li><a href="/static/html/admin-dashboard.html">Dashboard</a></li>
+                    <li><a href="/static/html/manage-stops.html">Stops</a></li>
+                    <li><a href="/static/html/manage-buses.html" class="active">Buses</a></li>
+                    <li><a href="/static/html/students.html">Students</a></li>
+                    <li><a href="/static/html/generate-allocation.html">Allocate</a></li>
+                    <li><a href="/static/html/routes.html">Routes</a></li>
+                    <li><a href="#" class="btn-logout" onclick="logout()">Logout</a></li>
+                </ul>
+            </div>
+        </nav>
+
+        <div class="dashboard-content">
+            <div class="container">
+                <div class="page-header slide-up">
+                    <h1>🚌 Manage Buses</h1>
+                    <p class="subtitle">Add, edit, or delete buses and driver information</p>
+                </div>
+
+                <div id="alert" class="alert"></div>
+
+                <div class="toolbar slide-up">
+                    <div></div>
+                    <button class="btn btn-primary" onclick="showAddModal()">+ Add Bus</button>
+                </div>
+
+                <div class="glass-card slide-up" style="padding: 0;">
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Bus Number</th>
+                                    <th>Capacity</th>
+                                    <th>Driver Name</th>
+                                    <th>Driver Phone</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="busesTable">
+                                <tr><td colspan="6" style="text-align:center;padding:40px;">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal -->
+    <div class="modal-overlay" id="modal">
+        <div class="modal">
+            <h2 id="modalTitle">Add Bus</h2>
+            <input type="hidden" id="editId">
+            <div class="form-group">
+                <label>Bus Number</label>
+                <input type="text" id="busNumber" class="form-control" placeholder="e.g. TS-01-BUS-006" required>
+            </div>
+            <div class="form-group">
+                <label>Capacity</label>
+                <input type="number" id="capacity" class="form-control" placeholder="e.g. 50" required>
+            </div>
+            <div class="form-group">
+                <label>Driver Name</label>
+                <input type="text" id="driverName" class="form-control" placeholder="Driver full name">
+            </div>
+            <div class="form-group">
+                <label>Driver Phone</label>
+                <input type="text" id="driverPhone" class="form-control" placeholder="e.g. 9876543210">
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="saveBus()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const token = localStorage.getItem('token');
+        if (!token || localStorage.getItem('role') !== 'admin') window.location.href = '/static/html/admin-login.html';
+        const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
+
+        async function loadBuses() {
+            try {
+                const res = await fetch('/admin/buses', { headers });
+                const buses = await res.json();
+                const tbody = document.getElementById('busesTable');
+
+                if (buses.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No buses added yet</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = buses.map(b => `
+                    <tr>
+                        <td>${b.bus_id}</td>
+                        <td><strong>${b.bus_number}</strong></td>
+                        <td>${b.capacity}</td>
+                        <td>${b.driver_name || '-'}</td>
+                        <td>${b.driver_phone || '-'}</td>
+                        <td>
+                            <div class="action-btns">
+                                <button class="btn btn-secondary btn-sm" onclick="editBus(${b.bus_id}, '${b.bus_number}', ${b.capacity}, '${b.driver_name||''}', '${b.driver_phone||''}')">Edit</button>
+                                <button class="btn btn-danger btn-sm" onclick="deleteBus(${b.bus_id})">Delete</button>
+                            </div>
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (err) { console.error(err); }
+        }
+
+        function showAddModal() {
+            document.getElementById('modalTitle').textContent = 'Add Bus';
+            document.getElementById('editId').value = '';
+            document.getElementById('busNumber').value = '';
+            document.getElementById('capacity').value = '50';
+            document.getElementById('driverName').value = '';
+            document.getElementById('driverPhone').value = '';
+            document.getElementById('modal').classList.add('show');
+        }
+
+        function editBus(id, num, cap, driver, phone) {
+            document.getElementById('modalTitle').textContent = 'Edit Bus';
+            document.getElementById('editId').value = id;
+            document.getElementById('busNumber').value = num;
+            document.getElementById('capacity').value = cap;
+            document.getElementById('driverName').value = driver;
+            document.getElementById('driverPhone').value = phone;
+            document.getElementById('modal').classList.add('show');
+        }
+
+        function closeModal() { document.getElementById('modal').classList.remove('show'); }
+
+        async function saveBus() {
+            const id = document.getElementById('editId').value;
+            const body = {
+                bus_number: document.getElementById('busNumber').value,
+                capacity: parseInt(document.getElementById('capacity').value),
+                driver_name: document.getElementById('driverName').value || null,
+                driver_phone: document.getElementById('driverPhone').value || null
+            };
+            const alert = document.getElementById('alert');
+
+            try {
+                const url = id ? `/admin/buses/${id}` : '/admin/buses';
+                const method = id ? 'PUT' : 'POST';
+                const res = await fetch(url, { method, headers, body: JSON.stringify(body) });
+                const data = await res.json();
+
+                if (!res.ok) {
+                    alert.className = 'alert alert-error show';
+                    alert.textContent = data.detail || 'Error';
+                    return;
+                }
+
+                alert.className = 'alert alert-success show';
+                alert.textContent = id ? 'Bus updated!' : 'Bus added!';
+                closeModal();
+                loadBuses();
+            } catch (err) {
+                alert.className = 'alert alert-error show';
+                alert.textContent = 'Connection error';
+            }
+        }
+
+        async function deleteBus(id) {
+            if (!confirm('Delete this bus?')) return;
+            const alert = document.getElementById('alert');
+            try {
+                const res = await fetch(`/admin/buses/${id}`, { method: 'DELETE', headers });
+                const data = await res.json();
+                if (!res.ok) { alert.className = 'alert alert-error show'; alert.textContent = data.detail; return; }
+                alert.className = 'alert alert-success show';
+                alert.textContent = 'Bus deleted!';
+                loadBuses();
+            } catch (err) { alert.className = 'alert alert-error show'; alert.textContent = 'Error'; }
+        }
+
+        function logout() { localStorage.clear(); window.location.href = '/static/html/admin-login.html'; }
+        loadBuses();
+    </script>
+</body>
+</html>

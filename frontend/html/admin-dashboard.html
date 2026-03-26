@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard | BVRIT Smart Bus</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="page-wrapper">
+        <nav class="navbar">
+            <div class="container">
+                <div class="navbar-brand">
+                    <div class="logo-icon">🛡️</div>
+                    BVRIT Admin
+                </div>
+                <ul class="navbar-links">
+                    <li><a href="/static/html/admin-dashboard.html" class="active">Dashboard</a></li>
+                    <li><a href="/static/html/manage-stops.html">Stops</a></li>
+                    <li><a href="/static/html/manage-buses.html">Buses</a></li>
+                    <li><a href="/static/html/students.html">Students</a></li>
+                    <li><a href="/static/html/generate-allocation.html">Allocate</a></li>
+                    <li><a href="/static/html/routes.html">Routes</a></li>
+                    <li><a href="#" class="btn-logout" onclick="logout()">Logout</a></li>
+                </ul>
+            </div>
+        </nav>
+
+        <div class="dashboard-content">
+            <div class="container">
+                <div class="page-header slide-up">
+                    <h1>Admin Dashboard</h1>
+                    <p class="subtitle">BVRIT Narsapur Smart Bus Management Overview</p>
+                </div>
+
+                <div class="stats-grid slide-up" style="animation-delay: 0.1s;">
+                    <div class="stat-card">
+                        <div class="stat-icon blue">📍</div>
+                        <div class="stat-value" id="totalStops">-</div>
+                        <div class="stat-label">Total Stops</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon purple">🚌</div>
+                        <div class="stat-value" id="totalBuses">-</div>
+                        <div class="stat-label">Total Buses</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon cyan">👥</div>
+                        <div class="stat-value" id="totalStudents">-</div>
+                        <div class="stat-label">Total Students</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon green">✅</div>
+                        <div class="stat-value" id="busStudents">-</div>
+                        <div class="stat-label">Bus Service Students</div>
+                    </div>
+                </div>
+
+                <div class="cards-grid slide-up" style="animation-delay: 0.2s;">
+                    <a href="/static/html/manage-stops.html" class="nav-card">
+                        <div class="card-icon">📍</div>
+                        <h3>Manage Stops</h3>
+                        <p>Add, edit, or remove pickup stops with coordinates</p>
+                    </a>
+                    <a href="/static/html/manage-buses.html" class="nav-card">
+                        <div class="card-icon">🚌</div>
+                        <h3>Manage Buses</h3>
+                        <p>Configure buses, capacity, and driver information</p>
+                    </a>
+                    <a href="/static/html/students.html" class="nav-card">
+                        <div class="card-icon">👥</div>
+                        <h3>View Students</h3>
+                        <p>View all student data and their selections</p>
+                    </a>
+                    <a href="/static/html/generate-allocation.html" class="nav-card">
+                        <div class="card-icon">⚡</div>
+                        <h3>Generate Allocation</h3>
+                        <p>Run the optimizer and assign students to buses</p>
+                    </a>
+                    <a href="/static/html/routes.html" class="nav-card">
+                        <div class="card-icon">🗺️</div>
+                        <h3>View Routes</h3>
+                        <p>View generated routes with stop ordering</p>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const token = localStorage.getItem('token');
+        if (!token || localStorage.getItem('role') !== 'admin') window.location.href = '/static/html/admin-login.html';
+
+        async function loadStats() {
+            const headers = { 'Authorization': `Bearer ${token}` };
+            try {
+                const [stopsRes, busesRes, studentsRes] = await Promise.all([
+                    fetch('/admin/stops', { headers }),
+                    fetch('/admin/buses', { headers }),
+                    fetch('/admin/students', { headers })
+                ]);
+
+                const stops = await stopsRes.json();
+                const buses = await busesRes.json();
+                const students = await studentsRes.json();
+
+                document.getElementById('totalStops').textContent = stops.length;
+                document.getElementById('totalBuses').textContent = buses.length;
+                document.getElementById('totalStudents').textContent = students.length;
+                document.getElementById('busStudents').textContent = students.filter(s => s.bus_required).length;
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        function logout() { localStorage.clear(); window.location.href = '/static/html/admin-login.html'; }
+        loadStats();
+    </script>
+</body>
+</html>
