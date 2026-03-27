@@ -252,28 +252,7 @@ def run_optimizer(db: Session) -> Dict[str, Any]:
             else:
                 break
 
-        # 2-opt post-processing to reduce distance
-        improved: bool = True
-        while improved:
-            improved = False
-            for i in range(1, len(route_sequence) - 1):
-                for j in range(i + 1, len(route_sequence)):
-                    a: Any = stop_map[route_sequence[i - 1]]
-                    b: Any = stop_map[route_sequence[i]]
-                    c: Any = stop_map[route_sequence[j]]
-                    d_node: Optional[Any] = stop_map[route_sequence[j + 1]] if j + 1 < len(route_sequence) else None
-                    
-                    d_ab = haversine(float(a.latitude), float(a.longitude), float(b.latitude), float(b.longitude))
-                    d_cd = haversine(float(c.latitude), float(c.longitude), float(d_node.latitude), float(d_node.longitude)) if d_node is not None else 0.0
-                    
-                    d_ac = haversine(float(a.latitude), float(a.longitude), float(c.latitude), float(c.longitude))
-                    d_bd = haversine(float(b.latitude), float(b.longitude), float(d_node.latitude), float(d_node.longitude)) if d_node is not None else 0.0
-                        
-                    if d_ac + d_bd < d_ab + d_cd:
-                        rev_slice = list(reversed(route_sequence[i:j+1]))
-                        for idx, val in enumerate(rev_slice):
-                            route_sequence[i + idx] = val
-                        improved = True
+
 
         # Calculate final accurate distance
         waypoints: List[Any] = [(float(stop_map[sid].latitude), float(stop_map[sid].longitude)) for sid in route_sequence]
