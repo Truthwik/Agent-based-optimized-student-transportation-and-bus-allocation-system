@@ -4,13 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Student Login | BVRIT Smart Bus</title>
-    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/style.css?v=1.1">
 </head>
 <body>
     <div class="page-wrapper">
         <div class="auth-wrapper">
             <div class="glass-card auth-card slide-up">
-                <div class="logo-icon-lg">🚌</div>
+                <div class="logo-icon-lg">
+                    <img src="/static/img/logo.png" alt="Vishnu Logo" style="width: 100%; height: 100%; object-fit: contain; border-radius: 20px;">
+                </div>
                 <h1>Welcome Back</h1>
                 <p class="subtitle">Please enter your credentials to login</p>
                 
@@ -42,7 +44,6 @@
             e.preventDefault();
             const alert = document.getElementById('alert');
             alert.className = 'alert';
-            alert.style.display = 'none';
 
             const username = document.getElementById('username').value.trim();
             const password = document.getElementById('password').value;

@@ -4,14 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Routes | BVRIT Smart Bus</title>
-    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/style.css?v=logo-theme-1">
 </head>
 <body>
     <div class="page-wrapper">
         <nav class="navbar">
             <div class="container">
                 <div class="navbar-brand">
-                    <div class="logo-icon">🛡️</div>
+                    <img class="logo-img" src="/static/img/logo.png" alt="Vishnu Logo" width="36" height="36" style="border-radius: 8px;">
                     BVRIT Admin
                 </div>
                 <ul class="navbar-links">
@@ -29,7 +29,7 @@
         <div class="dashboard-content">
             <div class="container">
                 <div class="page-header slide-up">
-                    <h1>🗺️ Generated Routes</h1>
+                    <h1><img src="/static/img/logo.png" alt="logo" width="32" height="32" style="vertical-align: middle; margin-right: 8px;"> Generated Routes</h1>
                     <p class="subtitle">View all bus routes with stop ordering</p>
                 </div>
 
@@ -64,8 +64,11 @@
                     return;
                 }
 
+                // Sort routes by bus number (numeric/natural sort)
+                routes.sort((a, b) => a.bus_number.localeCompare(b.bus_number, undefined, { numeric: true, sensitivity: 'base' }));
+
                 let html = `
-                    <div class="stats-grid slide-up" style="margin-bottom: 24px;">
+                        <div class="stats-grid slide-up" style="margin-bottom: 24px;">
                         <div class="stat-card">
                             <div class="stat-icon blue">🗺️</div>
                             <div class="stat-value">${routes.length}</div>
@@ -81,11 +84,6 @@
                             <div class="stat-value">${routes.reduce((s, r) => s + r.total_stops, 0)}</div>
                             <div class="stat-label">Stops Covered</div>
                         </div>
-                        <div class="stat-card">
-                            <div class="stat-icon orange" style="background: rgba(255, 152, 0, 0.1); color: #ff9800;">📏</div>
-                            <div class="stat-value">${routes.reduce((s, r) => s + r.total_distance, 0).toFixed(1)} <span style="font-size:1rem;">km</span></div>
-                            <div class="stat-label">Total Distance</div>
-                        </div>
                     </div>
                 `;
 
@@ -96,7 +94,7 @@
                                 <div>
                                     <h3 style="margin-bottom: 2px;">🚌 ${route.bus_number}</h3>
                                     <span style="font-size: 0.85rem; color: var(--text-secondary);">
-                                        Route #${route.route_id} · ${route.total_students} students · ${route.total_stops} stops · ${(route.total_distance || 0).toFixed(1)} km
+                                        ${route.total_students} students · ${route.total_stops} stops · ${(route.total_distance || 0).toFixed(1)} km
                                     </span>
                                 </div>
                             </div>
@@ -108,7 +106,7 @@
                                     ${i < route.stops.length - 1 ? '<span class="route-arrow">→</span>' : ''}
                                 `).join('')}
                                 <span class="route-arrow">→</span>
-                                <span class="route-stop-pill" style="background: rgba(0,230,118,0.1); border-color: rgba(0,230,118,0.2); color: var(--accent-green);">
+                                <span class="route-stop-pill" style="background: rgba(165,204,55,0.1); border-color: rgba(165,204,55,0.2); color: var(--accent-green);">
                                     🏫 BVRIT Campus
                                 </span>
                             </div>

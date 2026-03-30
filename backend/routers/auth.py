@@ -62,7 +62,7 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
             password_changed=(student.password != student.student_id)
         )
 
-    raise HTTPException(status_code=401, detail="Invalid credentials")
+    raise HTTPException(status_code=401, detail="Invalid ID or Password")
 
 
 @router.post("/change-password")

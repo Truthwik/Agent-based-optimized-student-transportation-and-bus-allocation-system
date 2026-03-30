@@ -4,14 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Students | BVRIT Smart Bus</title>
-    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/style.css?v=logo-theme-1">
 </head>
 <body>
     <div class="page-wrapper">
         <nav class="navbar">
             <div class="container">
                 <div class="navbar-brand">
-                    <div class="logo-icon">🛡️</div>
+                    <img class="logo-img" src="/static/img/logo.png" alt="Vishnu Logo" width="36" height="36" style="border-radius: 8px;">
                     BVRIT Admin
                 </div>
                 <ul class="navbar-links">
@@ -58,7 +58,15 @@
 
                 <div class="toolbar slide-up">
                     <input type="text" id="searchInput" class="form-control search-input" placeholder="🔍 Search by ID, name, or branch..." oninput="filterTable()">
-                    <select id="filterBranch" class="form-control" style="max-width: 160px;" onchange="filterTable()">
+                    <select id="filterAllocation" class="form-control" style="max-width: 170px;" onchange="filterTable()">
+                        <option value="">Allocation: All</option>
+                        <option value="allocated">Allocated Only</option>
+                        <option value="pending">Not Allocated</option>
+                    </select>
+                    <select id="filterBus" class="form-control" style="max-width: 160px;" onchange="filterTable()">
+                        <option value="">Filter by Bus</option>
+                    </select>
+                    <select id="filterBranch" class="form-control" style="max-width: 150px;" onchange="filterTable()">
                         <option value="">All Branches</option>
                         <option value="CSE">CSE</option>
                         <option value="ECE">ECE</option>
@@ -103,13 +111,26 @@
 
         async function loadData() {
             try {
-                const [studentsRes, stopsRes] = await Promise.all([
+                const [studentsRes, stopsRes, busesRes] = await Promise.all([
                     fetch('/admin/students', { headers }),
-                    fetch('/admin/stops', { headers })
+                    fetch('/admin/stops', { headers }),
+                    fetch('/admin/buses', { headers })
                 ]);
                 allStudents = await studentsRes.json();
                 const stops = await stopsRes.json();
+                const buses = await busesRes.json();
+
                 stops.forEach(s => stopsMap[s.stop_id] = s.stop_name);
+
+                // Sort buses by number
+                buses.sort((a, b) => a.bus_number.localeCompare(b.bus_number, undefined, { numeric: true }));
+
+                // Populate Bus Filter
+                const busFilter = document.getElementById('filterBus');
+                busFilter.innerHTML = '<option value="">Filter by Bus</option>';
+                buses.forEach(b => {
+                    busFilter.innerHTML += `<option value="${b.bus_id}">Bus #${b.bus_id} (${b.bus_number})</option>`;
+                });
 
                 document.getElementById('totalCount').textContent = allStudents.length;
                 document.getElementById('busCount').textContent = allStudents.filter(s => s.bus_required).length;
@@ -144,18 +165,33 @@
         function filterTable() {
             const search = document.getElementById('searchInput').value.toLowerCase();
             const branch = document.getElementById('filterBranch').value;
+            const allocation = document.getElementById('filterAllocation').value;
+            const busId = document.getElementById('filterBus').value;
 
             let filtered = allStudents;
+            
             if (search) {
                 filtered = filtered.filter(s =>
                     s.student_id.toLowerCase().includes(search) ||
                     s.name.toLowerCase().includes(search) ||
-                    s.branch.toLowerCase().includes(search)
+                    (s.branch && s.branch.toLowerCase().includes(search))
                 );
             }
+            
             if (branch) {
                 filtered = filtered.filter(s => s.branch === branch);
             }
+
+            if (allocation === 'allocated') {
+                filtered = filtered.filter(s => s.allocated_bus_id !== null);
+            } else if (allocation === 'pending') {
+                filtered = filtered.filter(s => s.bus_required && s.allocated_bus_id === null);
+            }
+
+            if (busId) {
+                filtered = filtered.filter(s => s.allocated_bus_id == busId);
+            }
+
             renderTable(filtered);
         }
 

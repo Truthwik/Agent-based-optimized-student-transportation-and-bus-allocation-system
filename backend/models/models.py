@@ -1,6 +1,6 @@
-from sqlalchemy import Column, Integer, String, Float, Boolean, ForeignKey  # type: ignore
-from sqlalchemy.orm import relationship  # type: ignore
-from backend.database import Base  # type: ignore
+from sqlalchemy import Column, Integer, String, Float, Boolean, ForeignKey
+from sqlalchemy.orm import relationship
+from backend.database import Base
 
 
 class Admin(Base):

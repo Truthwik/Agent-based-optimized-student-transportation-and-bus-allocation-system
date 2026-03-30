@@ -1,5 +1,5 @@
 import os
-from dotenv import load_dotenv  
+from dotenv import load_dotenv
 from pathlib import Path
 
 # Load .env from project root
@@ -21,8 +21,46 @@ JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 
 # Campus
 CAMPUS_NAME = os.getenv("CAMPUS_NAME", "BVRIT Narsapur")
-CAMPUS_LAT = float(os.getenv("CAMPUS_LAT", "18.0498"))
-CAMPUS_LNG = float(os.getenv("CAMPUS_LNG", "79.4425"))
+# Verified via Google Maps: Vishnupur, Narsapur, Tuljaraopet, Telangana 502313
+CAMPUS_LAT = float(os.getenv("CAMPUS_LAT", "17.7252584"))
+CAMPUS_LNG = float(os.getenv("CAMPUS_LNG", "78.2571511"))
 
-# OSRM
-OSRM_BASE_URL = os.getenv("OSRM_BASE_URL", "http://router.project-osrm.org")
+def _parse_hhmm_to_minutes(value: str, *, default_minutes: int) -> int:
+    """
+    Parse 'HH:MM' (24h) into minutes since midnight.
+    Falls back to default_minutes if value is missing/invalid.
+    """
+    try:
+        parts = value.strip().split(":")
+        if len(parts) != 2:
+            return default_minutes
+        hh = int(parts[0])
+        mm = int(parts[1])
+        if not (0 <= hh <= 23 and 0 <= mm <= 59):
+            return default_minutes
+        return hh * 60 + mm
+    except Exception:
+        return default_minutes
+
+# Campus arrival window (minutes since midnight)
+# Bus(ses) should arrive within this window.
+# Default keeps arrivals in the final 10 minutes before 9:00 AM.
+# Override via env (24h format): CAMPUS_ARRIVAL_MIN=08:50, CAMPUS_ARRIVAL_MAX=09:00
+CAMPUS_ARRIVAL_MIN_MINUTES = _parse_hhmm_to_minutes(
+    os.getenv("CAMPUS_ARRIVAL_MIN", "08:50"),
+    default_minutes=8 * 60 + 50,
+)
+CAMPUS_ARRIVAL_MAX_MINUTES = _parse_hhmm_to_minutes(
+    os.getenv("CAMPUS_ARRIVAL_MAX", "09:00"),
+    default_minutes=9 * 60,
+)
+
+# OSRM — local Docker server (see setup_osrm.sh)
+OSRM_BASE_URL = os.getenv("OSRM_BASE_URL", "http://localhost:5000")
+OSRM_TIMEOUT = int(os.getenv("OSRM_TIMEOUT", "10"))          # seconds per request
+OSRM_MAX_RETRIES = int(os.getenv("OSRM_MAX_RETRIES", "2"))   # retry before Haversine fallback
+
+# Haversine → road distance correction factors (used when OSRM is unavailable)
+DISTANCE_ROAD_FACTOR_URBAN = 1.35     # for stops < 15 km from campus
+DISTANCE_ROAD_FACTOR_MEDIUM = 1.22    # for stops 15-40 km from campus
+DISTANCE_ROAD_FACTOR_HIGHWAY = 1.15   # for stops > 40 km from campus

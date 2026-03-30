@@ -4,14 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Generate Allocation | BVRIT Smart Bus</title>
-    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/style.css?v=logo-theme-1">
 </head>
 <body>
     <div class="page-wrapper">
         <nav class="navbar">
             <div class="container">
                 <div class="navbar-brand">
-                    <div class="logo-icon">🛡️</div>
+                    <img class="logo-img" src="/static/img/logo.png" alt="BVRIT logo" width="32" height="32">
                     BVRIT Admin
                 </div>
                 <ul class="navbar-links">
@@ -181,7 +181,7 @@
                                 <div class="route-stops">
                                     ${r.stops.map((s, j) => `<span class="route-stop-pill">${s}</span>${j < r.stops.length - 1 ? '<span class="route-arrow">→</span>' : ''}`).join('')}
                                     <span class="route-arrow">→</span>
-                                    <span class="route-stop-pill" style="background: rgba(0,230,118,0.1); border-color: rgba(0,230,118,0.2); color: var(--accent-green);">🏫 BVRIT Campus</span>
+                                    <span class="route-stop-pill" style="background: rgba(165,204,55,0.1); border-color: rgba(165,204,55,0.2); color: var(--accent-green);">🏫 BVRIT Campus</span>
                                 </div>
                                 <div class="utilization-bar">
                                     <div class="fill ${utilClass}" style="width: ${r.utilization}%"></div>

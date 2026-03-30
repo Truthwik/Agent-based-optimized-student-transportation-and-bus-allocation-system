@@ -118,7 +118,7 @@ def get_students(db: Session = Depends(get_db), admin=Depends(verify_admin)):
 # ─── GENERATE ALLOCATION ──────────────────────────
 @router.post("/generate-allocation")
 def generate_allocation(db: Session = Depends(get_db), admin=Depends(verify_admin)):
-    from backend.services.optimizer_engine import run_optimizer  # type: ignore
+    from backend.services.optimizer_engine import run_optimizer
     result = run_optimizer(db)
     return result
 

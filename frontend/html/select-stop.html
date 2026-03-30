@@ -4,14 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Select Stop | BVRIT Smart Bus</title>
-    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/style.css?v=logo-theme-1">
 </head>
 <body>
     <div class="page-wrapper">
         <nav class="navbar">
             <div class="container">
                 <div class="navbar-brand">
-                    <div class="logo-icon">🚌</div>
+                    <img class="logo-img" src="/static/img/logo.png" alt="Vishnu Logo" width="36" height="36" style="border-radius: 8px; vertical-align: middle; margin-right: 8px;">
                     BVRIT Smart Bus
                 </div>
                 <ul class="navbar-links">
@@ -33,7 +33,7 @@
 
                 <div id="alert" class="alert"></div>
 
-                <div class="glass-card slide-up" style="max-width: 600px;">
+                <div id="selectionCard" class="glass-card slide-up" style="max-width: 600px;">
                     <form id="stopForm">
                         <div class="form-group">
                             <label>Do you need bus service?</label>
@@ -54,6 +54,45 @@
                         <button type="submit" class="btn btn-primary btn-block">Save Selection</button>
                     </form>
                 </div>
+
+                <!-- Already Allocated View -->
+                <div id="allocatedCard" class="glass-card slide-up" style="max-width: 600px; display: none;">
+                    <div style="text-align: center; margin-bottom: 24px;">
+                        <div class="stat-icon green" style="margin: 0 auto 16px; width: 64px; height: 64px; font-size: 2rem;">✅</div>
+                        <h2 style="color: var(--accent-green);">Bus Already Allocated</h2>
+                        <p id="allocatedMsg" style="color: var(--text-secondary); margin-top: 8px;">Your bus assignment is confirmed. You cannot change your selection directly.</p>
+                    </div>
+
+                    <div style="background: rgba(0,0,0,0.03); padding: 16px; border-radius: 12px; margin-bottom: 24px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                            <span style="color: var(--text-secondary);">Pickup Stop:</span>
+                            <strong id="currentStopName">-</strong>
+                        </div>
+                        <div style="display: flex; justify-content: space-between;">
+                            <span style="color: var(--text-secondary);">Assigned Bus:</span>
+                            <strong id="assignedBusNum">-</strong>
+                        </div>
+                    </div>
+
+                    <hr style="border: 0; border-top: 1px solid var(--glass-border); margin: 24px 0;">
+
+                    <h3>Request Stop Change</h3>
+                    <p class="subtitle" style="font-size: 0.85rem; margin-bottom: 16px;">If you need to change your stop, please submit a request to the admin.</p>
+                    
+                    <form id="requestForm">
+                        <div class="form-group">
+                            <label>New Requested Stop</label>
+                            <select id="newStopId" class="form-control" required>
+                                <option value="">-- Select New Stop --</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Reason for Change</label>
+                            <textarea id="changeReason" class="form-control" rows="3" placeholder="e.g. Moved to a different locality" required style="resize: none;"></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-secondary btn-block">Submit Change Request</button>
+                    </form>
+                </div>
             </div>
         </div>
     </div>
@@ -71,23 +110,6 @@
             if (val === 'yes' && !stopsLoaded) loadStops();
         }
 
-        async function loadStops() {
-            try {
-                const res = await fetch('/students/stops', {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                const stops = await res.json();
-                const sel = document.getElementById('stopId');
-                sel.innerHTML = '<option value="">-- Select a stop --</option>';
-                stops.forEach(s => {
-                    sel.innerHTML += `<option value="${s.stop_id}">${s.stop_name}</option>`;
-                });
-                stopsLoaded = true;
-            } catch (err) {
-                console.error(err);
-            }
-        }
-
         // Pre-load current selection
         async function loadCurrent() {
             try {
@@ -95,6 +117,27 @@
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 const data = await res.json();
+                
+                // Check if already allocated
+                if (data.allocated_bus_id) {
+                    document.getElementById('selectionCard').style.display = 'none';
+                    document.getElementById('allocatedCard').style.display = 'block';
+                    document.getElementById('assignedBusNum').textContent = `Bus #${data.allocated_bus_id}`;
+                    
+                    // Load stops for the request form even if allocated
+                    loadStops(true);
+                    
+                    if (data.stop_id) {
+                        const stopsRes = await fetch('/students/stops', {
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        const stops = await stopsRes.json();
+                        const stop = stops.find(s => s.stop_id === data.stop_id);
+                        if (stop) document.getElementById('currentStopName').textContent = stop.stop_name;
+                    }
+                    return;
+                }
+
                 if (data.bus_required) {
                     document.getElementById('busRequired').value = 'yes';
                     toggleStopSelect();
@@ -157,6 +200,42 @@
                 alert.textContent = 'Connection error';
             }
         });
+
+        document.getElementById('requestForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const alert = document.getElementById('alert');
+            
+            // Mocking the request submission
+            alert.className = 'alert alert-info show';
+            alert.textContent = '⏳ Change request submitted. Admin will review your request shortly.';
+            
+            // Clear the form
+            document.getElementById('requestForm').reset();
+            
+            // Scroll to top
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+
+        async function loadStops(isRequest = false) {
+            try {
+                const res = await fetch('/students/stops', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const stops = await res.json();
+                
+                const targetId = isRequest ? 'newStopId' : 'stopId';
+                const sel = document.getElementById(targetId);
+                
+                sel.innerHTML = `<option value="">-- Select ${isRequest ? 'New' : 'a'} Stop --</option>`;
+                stops.forEach(s => {
+                    sel.innerHTML += `<option value="${s.stop_id}">${s.stop_name}</option>`;
+                });
+                
+                if (!isRequest) stopsLoaded = true;
+            } catch (err) {
+                console.error(err);
+            }
+        }
 
         function logout() { localStorage.clear(); window.location.href = '/static/html/login.html'; }
         loadCurrent();

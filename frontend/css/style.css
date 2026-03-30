@@ -17,12 +17,12 @@
     --text-secondary: #475569;
     --text-muted: #94a3b8;
     --accent-blue: #3b82f6;
-    --accent-purple: #8b5cf6;
+    --accent-purple: #a2218d; /* logo magenta/purple */
     --accent-cyan: #06b6d4;
-    --accent-green: #10b981;
-    --accent-orange: #f59e0b;
+    --accent-green: #a5cc37;  /* logo green */
+    --accent-orange: #f48120; /* logo orange */
     --accent-red: #ef4444;
-    --gradient-primary: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+    --gradient-primary: linear-gradient(135deg, #a2218d 0%, #f48120 55%, #a5cc37 100%);
     --gradient-hero: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
     --shadow-glow: 0 0 30px rgba(59, 130, 246, 0.15);
     --shadow-card: 0 8px 32px rgba(0, 0, 0, 0.06);
@@ -113,7 +113,8 @@ a:hover {
 
 /* ─── Navbar ───────────────────────────────────────── */
 .navbar {
-    background: rgba(10, 14, 39, 0.85);
+    /* Solid purple navbar with white text */
+    background: rgba(162, 33, 141, 0.92);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     border-bottom: 1px solid var(--glass-border);
@@ -135,7 +136,7 @@ a:hover {
     gap: 12px;
     font-weight: 700;
     font-size: 1.15rem;
-    color: var(--text-primary);
+    color: #ffffff;
 }
 
 .navbar-brand .logo-icon {
@@ -150,6 +151,20 @@ a:hover {
     box-shadow: 0 4px 15px rgba(68, 138, 255, 0.3);
 }
 
+.navbar-brand .logo-img {
+    width: 32px !important;
+    height: 32px !important;
+    max-width: 32px !important;
+    max-height: 32px !important;
+    border-radius: 10px;
+    display: block;
+    object-fit: contain;
+    flex: 0 0 auto;
+    background: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.18);
+    filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.25));
+}
+
 .navbar-links {
     display: flex;
     gap: 8px;
@@ -159,7 +174,7 @@ a:hover {
 .navbar-links a {
     padding: 8px 16px;
     border-radius: var(--radius-sm);
-    color: var(--text-secondary);
+    color: rgba(255, 255, 255, 0.92);
     font-size: 0.9rem;
     font-weight: 500;
     transition: var(--transition);
@@ -167,13 +182,13 @@ a:hover {
 
 .navbar-links a:hover,
 .navbar-links a.active {
-    background: var(--glass-bg);
-    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.16);
+    color: #ffffff;
 }
 
 .btn-logout {
     background: rgba(255, 82, 82, 0.15);
-    color: var(--accent-red) !important;
+    color: #ffffff !important;
     border: 1px solid rgba(255, 82, 82, 0.2);
 }
 
@@ -214,16 +229,16 @@ a:hover {
 }
 
 .auth-card .logo-icon-lg {
-    width: 64px;
-    height: 64px;
+    width: 90px;
+    height: 90px;
     background: var(--gradient-primary);
-    border-radius: 18px;
+    border-radius: 24px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 2rem;
-    margin-bottom: 20px;
-    box-shadow: 0 8px 30px rgba(68, 138, 255, 0.3);
+    font-size: 2.8rem;
+    margin-bottom: 24px;
+    box-shadow: 0 10px 40px rgba(162, 33, 141, 0.4);
     animation: pulse-glow 3s ease-in-out infinite;
 }
 
@@ -414,34 +429,37 @@ select.form-control option {
 }
 
 .stat-card .stat-icon {
-    width: 44px;
-    height: 44px;
-    border-radius: 12px;
+    width: 60px;
+    height: 60px;
+    border-radius: 16px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.3rem;
-    margin-bottom: 14px;
+    font-size: 2.2rem;
+    margin-bottom: 16px;
+    font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", "Inter", sans-serif;
+    color: initial;
+    filter: drop-shadow(0 4px 10px rgba(0,0,0,0.15));
 }
 
 .stat-card .stat-icon.blue {
-    background: rgba(68, 138, 255, 0.15);
+    background: rgba(244, 129, 32, 0.15); /* orange */
 }
 
 .stat-card .stat-icon.purple {
-    background: rgba(124, 77, 255, 0.15);
+    background: rgba(162, 33, 141, 0.15); /* logo purple */
 }
 
 .stat-card .stat-icon.cyan {
-    background: rgba(0, 229, 255, 0.15);
+    background: rgba(165, 204, 55, 0.15); /* logo green */
 }
 
 .stat-card .stat-icon.green {
-    background: rgba(0, 230, 118, 0.15);
+    background: rgba(165, 204, 55, 0.15); /* logo green */
 }
 
 .stat-card .stat-icon.orange {
-    background: rgba(255, 145, 0, 0.15);
+    background: rgba(244, 129, 32, 0.15); /* logo orange */
 }
 
 .stat-card .stat-value {
@@ -484,8 +502,11 @@ select.form-control option {
 }
 
 .nav-card .card-icon {
-    font-size: 2rem;
-    margin-bottom: 16px;
+    font-size: 2.8rem;
+    margin-bottom: 20px;
+    font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif;
+    color: initial;
+    filter: drop-shadow(0 4px 10px rgba(0,0,0,0.18));
 }
 
 .nav-card h3 {
