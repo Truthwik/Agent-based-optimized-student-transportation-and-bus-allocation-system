@@ -50,7 +50,11 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
     admin = db.query(Admin).filter(Admin.username == req.username).first()
     if admin and admin.password == req.password:
         token = create_token({"sub": admin.username, "role": "admin"})
-        return LoginResponse(token=token, role="admin")
+        return LoginResponse(
+            token=token,
+            role="admin",
+            password_changed=(admin.password != admin.username)
+        )
 
     # Try student login
     student = db.query(Student).filter(Student.student_id == req.username).first()
@@ -72,15 +76,23 @@ def change_password(
     db: Session = Depends(get_db)
 ):
     payload = decode_token(token)
-    student_id = payload.get("sub")
+    user_id = payload.get("sub")
+    role = payload.get("role")
 
-    student = db.query(Student).filter(Student.student_id == student_id).first()
-    if not student:
-        raise HTTPException(status_code=404, detail="Student not found")
+    if role == "admin":
+        user = db.query(Admin).filter(Admin.username == user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="[Auth] Admin account not found")
+    elif role == "student":
+        user = db.query(Student).filter(Student.student_id == user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="[Auth] Student account not found")
+    else:
+        raise HTTPException(status_code=401, detail="[Auth] Invalid role")
 
-    if student.password != req.old_password:
-        raise HTTPException(status_code=400, detail="Old password is incorrect")
+    if user.password != req.old_password:
+        raise HTTPException(status_code=400, detail="[Auth] Current password is incorrect")
 
-    student.password = req.new_password
+    user.password = req.new_password
     db.commit()
     return {"message": "Password changed successfully"}

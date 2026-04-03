@@ -18,16 +18,30 @@ import requests
 from sqlalchemy.orm import Session
 from typing import Dict, List, Any, Optional, Tuple
 
-from backend.models.models import Student, Stop, Bus, Route, RouteStop, Allocation  # type: ignore
-from backend.config import (
-    CAMPUS_LAT,
-    CAMPUS_LNG,
-    OSRM_BASE_URL,
-    OSRM_TIMEOUT,
-    OSRM_MAX_RETRIES,
-    CAMPUS_ARRIVAL_MIN_MINUTES,
-    CAMPUS_ARRIVAL_MAX_MINUTES,
-)  # type: ignore
+try:
+    # When running the app as `backend.*` (uvicorn backend.main:app)
+    from backend.models.models import Student, Stop, Bus, Route, RouteStop, Allocation
+    from backend.config import (
+        CAMPUS_LAT,
+        CAMPUS_LNG,
+        OSRM_BASE_URL,
+        OSRM_TIMEOUT,
+        OSRM_MAX_RETRIES,
+        CAMPUS_ARRIVAL_MIN_MINUTES,
+        CAMPUS_ARRIVAL_MAX_MINUTES,
+    )
+except ImportError:  # pragma: no cover
+    # When running this module in other contexts (e.g., some IDE test runners)
+    from ..models.models import Student, Stop, Bus, Route, RouteStop, Allocation
+    from ..config import (
+        CAMPUS_LAT,
+        CAMPUS_LNG,
+        OSRM_BASE_URL,
+        OSRM_TIMEOUT,
+        OSRM_MAX_RETRIES,
+        CAMPUS_ARRIVAL_MIN_MINUTES,
+        CAMPUS_ARRIVAL_MAX_MINUTES,
+    )
 
 logger = logging.getLogger("optimizer_engine")
 logging.basicConfig(level=logging.INFO)

@@ -24,7 +24,7 @@ def verify_admin(authorization: str = Header(...), db: Session = Depends(get_db)
         raise HTTPException(status_code=403, detail="Admin access required")
     admin = db.query(Admin).filter(Admin.username == payload.get("sub")).first()
     if not admin:
-        raise HTTPException(status_code=401, detail="Admin not found")
+        raise HTTPException(status_code=401, detail="[Admin] Admin not found")
     return admin
 
 

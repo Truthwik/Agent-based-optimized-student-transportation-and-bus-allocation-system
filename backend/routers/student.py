@@ -20,7 +20,7 @@ def verify_student(authorization: str = Header(...), db: Session = Depends(get_d
         raise HTTPException(status_code=403, detail="Student access required")
     student = db.query(Student).filter(Student.student_id == payload.get("sub")).first()
     if not student:
-        raise HTTPException(status_code=401, detail="Student not found")
+        raise HTTPException(status_code=401, detail="[Student] Student not found")
     return student
 
 
