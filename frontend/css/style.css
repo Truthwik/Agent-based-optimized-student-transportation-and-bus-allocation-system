@@ -316,6 +316,74 @@ select.form-control option {
     color: var(--text-primary);
 }
 
+/* ─── Password Toggle ──────────────────────────────── */
+/* ─── Premium Input Group (Reference Match) ───────── */
+.premium-input-group {
+    position: relative;
+    background: #ffffff;
+    border: 1.2px solid var(--glass-border);
+    border-radius: 20px;
+    padding: 10px 18px;
+    margin-bottom: 20px;
+    display: flex;
+    flex-direction: column;
+    text-align: left;
+    transition: var(--transition);
+}
+
+.premium-input-group:focus-within {
+    border-color: var(--accent-blue);
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+}
+
+.premium-input-group label {
+    font-size: 0.75rem !important;
+    font-weight: 600 !important;
+    color: var(--text-muted) !important;
+    margin-bottom: 2px !important;
+    text-transform: none !important;
+    letter-spacing: normal !important;
+}
+
+.premium-input-group input {
+    border: none !important;
+    background: transparent !important;
+    padding: 0 !important;
+    font-size: 1rem !important;
+    color: var(--text-primary) !important;
+    outline: none !important;
+    width: 100% !important;
+    height: 24px !important;
+    box-shadow: none !important;
+}
+
+.premium-input-group .password-toggle {
+    position: absolute !important;
+    right: 12px !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+    background: none !important;
+    border: none !important;
+    padding: 6px !important;
+    cursor: pointer !important;
+    color: var(--text-muted) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    z-index: 10 !important;
+    opacity: 0.8 !important;
+}
+
+.premium-input-group .password-toggle:hover {
+    color: var(--accent-blue) !important;
+    opacity: 1 !important;
+}
+
+.premium-input-group .password-toggle svg {
+    width: 22px !important;
+    height: 22px !important;
+}
+
 /* ─── Buttons ──────────────────────────────────────── */
 .btn {
     display: inline-flex;
