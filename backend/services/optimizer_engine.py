@@ -94,12 +94,8 @@ def _osrm_get(url: str) -> Optional[requests.Response]:
 CORRIDOR_ANGLE_WINDOW = 20.0         # degrees — max angular width of a corridor
 CORRIDOR_MERGE_ANGLE = 30.0          # degrees — max angle diff for merging corridors (corridor build)
 MERGE_BEARING_TOLERANCE = 45.0       # degrees — wider tolerance for post-assignment merge pass
-CORRIDOR_DISTANCE_PROXIMITY = 15.0   # km — distance proximity for corridor membership
 CORRIDOR_DETOUR_FACTOR = 1.25        # FIX 3: tightened from 1.4 — ejects cross-city stops sooner
 MIN_FILL_FRACTION = 0.75             # 75% minimum bus fill
-HIGHWAY_DISTANCE_THRESHOLD = 25.0    # km — stops farther than this use 50 km/h
-CITY_SPEED_KMH = 30.0
-HIGHWAY_SPEED_KMH = 50.0
 DWELL_TIME_MINUTES = 2.0
 AVG_SPEED_KMPH = 35.0                # FIX 1: flat average — real college data shows 33–38 km/h
 DISTANCE_SANITY_LIMIT_KM = 80.0
@@ -109,9 +105,6 @@ HAVERSINE_ROAD_FACTOR = 1.3          # multiply haversine by this for road dista
 # These are only for validation/QA to catch “far apart stops in one route”.
 NEAR_STOP_MAX_SPREAD_KM = 60.0       # max haversine distance between any two stops in the same route
 NEAR_STOP_MAX_GAP_KM = 30.0          # max haversine distance between consecutive stops in the route
-
-# ─── Campus stop filter keywords ─────────────────────────
-CAMPUS_STOP_KEYWORDS = ['bvrit', 'campus', 'college', 'institute']
 
 
 # ═══════════════════════════════════════════════════════════
@@ -251,10 +244,10 @@ def run_optimizer(db: Session) -> Dict[str, Any]:
     db.query(Student).update({Student.allocated_bus_id: None})
     db.commit()
 
-    # ─── STEP 1: FETCH STUDENTS ───────────────────────
     students = db.query(Student).filter(
         Student.bus_required == True,
-        Student.stop_id.isnot(None)
+        Student.stop_id.isnot(None),
+        (Student.allocation_type != "daywise") | (Student.allocation_type.is_(None))
     ).all()
 
     if not students:
@@ -673,11 +666,12 @@ def run_optimizer(db: Session) -> Dict[str, Any]:
         if best_target is not None:
             # Merge: move all stops & students from a into target
             target = assignments_active[best_target]
-            print(
-                f"[MERGE] {a['total_students']} students "
-                f"(corridor {a['avg_bearing']:.0f}deg) merged into "
-                f"Bus {target['bus'].bus_number} "
-                f"(corridor {target['avg_bearing']:.0f}deg)"
+            logger.info(
+                "[MERGE] %s students (corridor %.0fdeg) merged into Bus %s (corridor %.0fdeg)",
+                a["total_students"],
+                a["avg_bearing"],
+                target["bus"].bus_number,
+                target["avg_bearing"],
             )
             for sid, studs in a["student_map"].items():
                 if sid not in target["student_map"]:
@@ -1018,42 +1012,45 @@ def run_optimizer(db: Session) -> Dict[str, Any]:
                     duplicate_stops.append(stop_name)
             all_route_stops.append(stop_name)
 
-    print("\n" + "=" * 60)
-    print("  OPTIMIZER VALIDATION REPORT")
-    print("=" * 60)
-    print(f"  Total routes generated     : {len(routes_created)}")
-    print(f"  Total students allocated   : {total_allocated}")
-    print(f"  Total students unassigned  : {total_unassigned}")
-    print(f"  Average fill percentage    : {avg_fill:.1f}%")
-    print(f"  Average stops per bus      : {avg_stops:.1f}")
+    lines = [
+        "",
+        "=" * 60,
+        "  OPTIMIZER VALIDATION REPORT",
+        "=" * 60,
+        f"  Total routes generated     : {len(routes_created)}",
+        f"  Total students allocated   : {total_allocated}",
+        f"  Total students unassigned  : {total_unassigned}",
+        f"  Average fill percentage    : {avg_fill:.1f}%",
+        f"  Average stops per bus      : {avg_stops:.1f}",
+    ]
     if over_distance:
-        print(f"  [!] Routes > {DISTANCE_SANITY_LIMIT_KM}km distance : Bus {', '.join(over_distance)}")
+        lines.append(f"  [!] Routes > {DISTANCE_SANITY_LIMIT_KM}km distance : Bus {', '.join(over_distance)}")
     else:
-        print(f"  [OK] All routes within {DISTANCE_SANITY_LIMIT_KM}km distance limit")
+        lines.append(f"  [OK] All routes within {DISTANCE_SANITY_LIMIT_KM}km distance limit")
     if duplicate_stops:
-        print(f"  [!] Duplicate stops found    : {', '.join(duplicate_stops)}")
+        lines.append(f"  [!] Duplicate stops found    : {', '.join(duplicate_stops)}")
     else:
-        print(f"  [OK] No duplicate stops across routes")
+        lines.append("  [OK] No duplicate stops across routes")
 
-    # Check for “far apart stops grouped together”
     near_violations = [
         r["bus_number"]
         for r in routes_created
         if not r.get("near_stops_ok", True)
     ]
     if near_violations:
-        print(
+        lines.append(
             f"  [!] Non-near stop groupings : Bus {', '.join(map(str, near_violations[:10]))}"
             + (" ..." if len(near_violations) > 10 else "")
         )
     else:
-        print(f"  [OK] All routes look geographically near (QA thresholds)")
+        lines.append("  [OK] All routes look geographically near (QA thresholds)")
     under_cap_routes = [r["bus_number"] for r in routes_created if r["under_capacity"]]
     if under_cap_routes:
-        print(f"  [!] Under-capacity buses     : Bus {', '.join(under_cap_routes)}")
+        lines.append(f"  [!] Under-capacity buses     : Bus {', '.join(under_cap_routes)}")
     else:
-        print(f"  [OK] All buses meet 75% minimum fill")
-    print("=" * 60 + "\n")
+        lines.append("  [OK] All buses meet 75% minimum fill")
+    lines.append("=" * 60)
+    logger.info("%s", "\n".join(lines))
 
     return {
         "message": f"Allocation complete. {len(routes_created)} routes generated.",

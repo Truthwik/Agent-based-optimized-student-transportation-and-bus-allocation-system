@@ -60,7 +60,7 @@ OSRM_BASE_URL = os.getenv("OSRM_BASE_URL", "http://localhost:5000")
 OSRM_TIMEOUT = int(os.getenv("OSRM_TIMEOUT", "10"))          # seconds per request
 OSRM_MAX_RETRIES = int(os.getenv("OSRM_MAX_RETRIES", "2"))   # retry before Haversine fallback
 
-# Haversine → road distance correction factors (used when OSRM is unavailable)
-DISTANCE_ROAD_FACTOR_URBAN = 1.35     # for stops < 15 km from campus
-DISTANCE_ROAD_FACTOR_MEDIUM = 1.22    # for stops 15-40 km from campus
-DISTANCE_ROAD_FACTOR_HIGHWAY = 1.15   # for stops > 40 km from campus
+# Razorpay
+RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID", "")
+RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET", "")
+DAY_PASS_FARE = int(os.getenv("DAY_PASS_FARE", "50"))

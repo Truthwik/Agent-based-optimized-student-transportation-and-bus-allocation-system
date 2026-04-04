@@ -49,10 +49,12 @@ class Student(Base):
     bus_required = Column(Boolean, default=False)
     stop_id = Column(Integer, ForeignKey("stops.stop_id"), nullable=True)
     allocated_bus_id = Column(Integer, ForeignKey("buses.bus_id"), nullable=True)
+    allocation_type = Column(String(20), nullable=True)  # 'yearwise', 'daywise', or NULL
 
     stop = relationship("Stop", back_populates="students")
     allocated_bus = relationship("Bus", back_populates="students")
     allocations = relationship("Allocation", back_populates="student")
+    day_passes = relationship("DayPassBooking", back_populates="student")
 
 
 class Route(Base):
@@ -90,3 +92,28 @@ class Allocation(Base):
 
     student = relationship("Student", back_populates="allocations")
     bus = relationship("Bus", back_populates="allocations")
+
+
+class DayPassBooking(Base):
+    __tablename__ = "day_pass_bookings"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    student_id = Column(String(20), ForeignKey("students.student_id"), nullable=False)
+    bus_id = Column(Integer, ForeignKey("buses.bus_id"), nullable=False)
+    stop_id = Column(Integer, ForeignKey("stops.stop_id"), nullable=False)
+    booking_date = Column(String(10), nullable=False)  # YYYY-MM-DD
+    razorpay_payment_id = Column(String(100), nullable=True)
+    razorpay_order_id = Column(String(100), nullable=True)
+    status = Column(String(20), default="pending")  # 'pending', 'confirmed', 'failed'
+    created_at = Column(String(30), nullable=True)
+
+    student = relationship("Student", back_populates="day_passes")
+
+
+class BusDailyCapacity(Base):
+    __tablename__ = "bus_daily_capacity"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    bus_id = Column(Integer, ForeignKey("buses.bus_id"), nullable=False)
+    travel_date = Column(String(10), nullable=False)  # YYYY-MM-DD
+    booked_seats = Column(Integer, default=0)

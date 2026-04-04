@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Header
 from sqlalchemy.orm import Session
-from typing import List, Optional
+from typing import List
 
 from backend.database import get_db
 from backend.models.models import Admin, Stop, Bus, Student, Route, RouteStop, Allocation

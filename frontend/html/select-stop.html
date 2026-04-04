@@ -5,6 +5,62 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Select Stop | BVRIT Smart Bus</title>
     <link rel="stylesheet" href="/static/css/style.css?v=logo-theme-1">
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+    <style>
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(8px);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .selection-box {
+            border: 2px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 20px;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            background: rgba(255, 255, 255, 0.05);
+        }
+        .selection-box:hover {
+            border-color: var(--primary-accent);
+            background: rgba(var(--primary-rgb), 0.1);
+            transform: translateY(-4px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        }
+        .bus-option {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            padding: 16px;
+            border-radius: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        .bus-option:hover {
+            border-color: var(--primary-accent);
+            transform: translateX(4px);
+        }
+        .bus-info strong { display: block; margin-bottom: 4px; }
+        .bus-info span { font-size: 0.85rem; color: var(--text-secondary); }
+        .seats-tag {
+            background: rgba(var(--accent-green-rgb), 0.1);
+            color: var(--accent-green);
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+    </style>
 </head>
 <body>
     <div class="page-wrapper">
@@ -33,7 +89,30 @@
 
                 <div id="alert" class="alert"></div>
 
-                <div id="selectionCard" class="glass-card slide-up" style="max-width: 600px;">
+                <!-- 4th Year Choice Modal -->
+                <div id="choiceOverlay" class="modal-overlay" style="display: none;">
+                    <div class="glass-card auth-card slide-up" style="max-width: 500px; text-align: center;">
+                        <div class="logo-icon-lg">🚌</div>
+                        <h2>How would you like to travel?</h2>
+                        <p class="subtitle" style="margin-bottom: 24px;">As a 4th year student, you have two options for bus travel.</p>
+                        
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+                            <div class="selection-box" onclick="selectPassType('yearwise')">
+                                <div style="font-size: 2rem; margin-bottom: 8px;">🗓️</div>
+                                <strong>Year Pass</strong>
+                                <p style="font-size: 0.75rem; margin-top: 4px; color: var(--text-secondary);">Full academic year allocation</p>
+                            </div>
+                            <div class="selection-box" onclick="selectPassType('daywise')">
+                                <div style="font-size: 2rem; margin-bottom: 8px;">🎫</div>
+                                <strong>Day Pass</strong>
+                                <p style="font-size: 0.75rem; margin-top: 4px; color: var(--text-secondary);">One-time seat booking (₹50/day)</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Normal Selection Card -->
+                <div id="selectionCard" class="glass-card slide-up" style="max-width: 600px; display: none;">
                     <form id="stopForm">
                         <div class="form-group">
                             <label>Do you need bus service?</label>
@@ -53,6 +132,30 @@
 
                         <button type="submit" class="btn btn-primary btn-block">Save Selection</button>
                     </form>
+                </div>
+
+                <!-- Day Pass Selection Card -->
+                <div id="dayPassCard" class="glass-card slide-up" style="max-width: 600px; display: none;">
+                    <h2>🎫 Book a Day Pass</h2>
+                    <p class="subtitle">Select a stop and book a seat for today</p>
+                    
+                    <div class="form-group">
+                        <label>Pickup Stop</label>
+                        <select id="dayStopId" class="form-control" onchange="checkBusAvailability()">
+                            <option value="">-- Select Stop --</option>
+                        </select>
+                    </div>
+
+                    <div id="busListContainer" style="margin-top: 24px; display: none;">
+                        <label>Available Buses for Today</label>
+                        <div id="busList" style="display: grid; gap: 12px; margin-top: 8px;">
+                            <!-- Bus options injected here -->
+                        </div>
+                    </div>
+
+                    <div id="noBusesMsg" style="display: none; text-align: center; padding: 24px; color: var(--text-secondary);">
+                        <p>❌ No seats left on buses passing through this stop for today. Please choose another nearest stop.</p>
+                    </div>
                 </div>
 
                 <!-- Already Allocated View -->
@@ -102,53 +205,210 @@
         if (!token || localStorage.getItem('role') !== 'student') window.location.href = '/static/html/login.html';
 
         let stopsLoaded = false;
+        let userData = null;
 
         function toggleStopSelect() {
             const val = document.getElementById('busRequired').value;
             const group = document.getElementById('stopGroup');
             group.style.display = val === 'yes' ? 'block' : 'none';
-            if (val === 'yes' && !stopsLoaded) loadStops();
+            if (val === 'yes' && !stopsLoaded) loadStops('stopId');
         }
 
-        // Pre-load current selection
         async function loadCurrent() {
             try {
                 const res = await fetch('/students/me', {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
-                const data = await res.json();
+                userData = await res.json();
                 
-                // Check if already allocated
-                if (data.allocated_bus_id) {
+                // 4th Year Choice Logic
+                if (userData.year === 4 && !userData.allocation_type) {
+                    document.getElementById('choiceOverlay').style.display = 'flex';
+                    return;
+                }
+
+                if (userData.allocation_type === 'daywise') {
+                    document.getElementById('selectionCard').style.display = 'none';
+                    document.getElementById('dayPassCard').style.display = 'block';
+                    loadStops('dayStopId');
+                    return;
+                }
+
+                document.getElementById('selectionCard').style.display = 'block';
+
+                if (userData.allocated_bus_id) {
                     document.getElementById('selectionCard').style.display = 'none';
                     document.getElementById('allocatedCard').style.display = 'block';
-                    document.getElementById('assignedBusNum').textContent = `Bus #${data.allocated_bus_id}`;
+                    document.getElementById('assignedBusNum').textContent = `Bus #${userData.allocated_bus_id}`;
+                    loadStops('newStopId');
                     
-                    // Load stops for the request form even if allocated
-                    loadStops(true);
-                    
-                    if (data.stop_id) {
+                    if (userData.stop_id) {
                         const stopsRes = await fetch('/students/stops', {
                             headers: { 'Authorization': `Bearer ${token}` }
                         });
                         const stops = await stopsRes.json();
-                        const stop = stops.find(s => s.stop_id === data.stop_id);
+                        const stop = stops.find(s => s.stop_id === userData.stop_id);
                         if (stop) document.getElementById('currentStopName').textContent = stop.stop_name;
                     }
                     return;
                 }
 
-                if (data.bus_required) {
+                if (userData.bus_required) {
                     document.getElementById('busRequired').value = 'yes';
                     toggleStopSelect();
-                    // Wait for stops to load, then set
                     setTimeout(() => {
-                        document.getElementById('stopId').value = data.stop_id || '';
+                        document.getElementById('stopId').value = userData.stop_id || '';
                     }, 500);
-                } else if (data.bus_required === false && data.stop_id === null) {
-                    // Not set yet
+                } else if (userData.bus_required === false && userData.stop_id === null) {
                 } else {
                     document.getElementById('busRequired').value = 'no';
+                }
+            } catch (err) {}
+        }
+
+        async function selectPassType(type) {
+            try {
+                const res = await fetch('/students/choose-pass-type', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ allocation_type: type })
+                });
+
+                if (res.ok) {
+                    document.getElementById('choiceOverlay').style.display = 'none';
+                    loadCurrent();
+                } else {
+                    const data = await res.json();
+                    alert('Error: ' + (data.detail || 'Failed to set pass type'));
+                }
+            } catch (err) {
+                alert('Connection error: ' + err.message);
+            }
+        }
+
+        async function loadStops(targetId) {
+            try {
+                const res = await fetch('/students/stops', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const stops = await res.json();
+                const sel = document.getElementById(targetId);
+                if (!sel) return;
+                
+                sel.innerHTML = `<option value="">-- Select Stop --</option>`;
+                stops.forEach(s => {
+                    sel.innerHTML += `<option value="${s.stop_id}">${s.stop_name}</option>`;
+                });
+                if (targetId === 'stopId') stopsLoaded = true;
+            } catch (err) {}
+        }
+
+        async function checkBusAvailability() {
+            const stopId = document.getElementById('dayStopId').value;
+            const container = document.getElementById('busListContainer');
+            const list = document.getElementById('busList');
+            const noBuses = document.getElementById('noBusesMsg');
+
+            if (!stopId) {
+                container.style.display = 'none';
+                return;
+            }
+
+            const today = new Date().toISOString().split('T')[0];
+            try {
+                const res = await fetch(`/students/day-pass/available-buses?stop_id=${stopId}&date=${today}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const buses = await res.json();
+
+                list.innerHTML = '';
+                if (buses.length > 0) {
+                    container.style.display = 'block';
+                    noBuses.style.display = 'none';
+                    buses.forEach(b => {
+                        list.innerHTML += `
+                            <div class="bus-option" onclick="initiateDayPassPayment(${b.bus_id}, ${stopId})">
+                                <div class="bus-info">
+                                    <strong>Bus #${b.bus_number}</strong>
+                                    <span>${b.route_name}</span>
+                                </div>
+                                <div class="seats-tag">${b.available_seats} seats left</div>
+                            </div>
+                        `;
+                    });
+                } else {
+                    container.style.display = 'none';
+                    noBuses.style.display = 'block';
+                }
+            } catch (err) {}
+        }
+
+        async function initiateDayPassPayment(busId, stopId) {
+            const alert = document.getElementById('alert');
+            try {
+                const res = await fetch('/students/day-pass/create-order', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+                
+                if (!res.ok) {
+                    alert.className = 'alert alert-error show';
+                    alert.textContent = data.detail || 'Failed to create order';
+                    return;
+                }
+
+                const options = {
+                    "key": "rzp_test_SZ5I7b52Kaes4R",
+                    "amount": data.amount,
+                    "currency": "INR",
+                    "name": "BVRIT Smart Bus",
+                    "description": "One-Day Bus Pass",
+                    "order_id": data.order_id,
+                    "handler": async function (response) {
+                        await confirmPayment(response, busId, stopId);
+                    },
+                    "theme": { "color": "#8b5cf6" }
+                };
+                const rzp = new Razorpay(options);
+                rzp.open();
+            } catch (err) {
+                alert.className = 'alert alert-error show';
+                alert.textContent = 'Payment initialization failed';
+            }
+        }
+
+        async function confirmPayment(rzpResponse, busId, stopId) {
+            const alert = document.getElementById('alert');
+            const today = new Date().toISOString().split('T')[0];
+            try {
+                const res = await fetch('/students/day-pass/confirm', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        razorpay_payment_id: rzpResponse.razorpay_payment_id,
+                        razorpay_order_id: rzpResponse.razorpay_order_id,
+                        razorpay_signature: rzpResponse.razorpay_signature,
+                        stop_id: stopId,
+                        bus_id: busId,
+                        date: today
+                    })
+                });
+
+                if (res.ok) {
+                    alert.className = 'alert alert-success show';
+                    alert.textContent = '✅ Payment successful! Redirecting to dashboard...';
+                    setTimeout(() => window.location.href = '/static/html/dashboard.html', 2000);
+                } else {
+                    const data = await res.json();
+                    alert.className = 'alert alert-error show';
+                    alert.textContent = data.detail || 'Payment confirmation failed';
                 }
             } catch (err) {}
         }
@@ -185,57 +445,16 @@
                     body: JSON.stringify(body)
                 });
 
-                const data = await res.json();
-
-                if (!res.ok) {
+                if (res.ok) {
+                    alert.className = 'alert alert-success show';
+                    alert.textContent = '✅ Selection saved successfully!';
+                } else {
+                    const data = await res.json();
                     alert.className = 'alert alert-error show';
                     alert.textContent = data.detail || 'Failed to save';
-                    return;
                 }
-
-                alert.className = 'alert alert-success show';
-                alert.textContent = '✅ Selection saved successfully!';
-            } catch (err) {
-                alert.className = 'alert alert-error show';
-                alert.textContent = 'Connection error';
-            }
+            } catch (err) {}
         });
-
-        document.getElementById('requestForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const alert = document.getElementById('alert');
-            
-            // Mocking the request submission
-            alert.className = 'alert alert-info show';
-            alert.textContent = '⏳ Change request submitted. Admin will review your request shortly.';
-            
-            // Clear the form
-            document.getElementById('requestForm').reset();
-            
-            // Scroll to top
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-        });
-
-        async function loadStops(isRequest = false) {
-            try {
-                const res = await fetch('/students/stops', {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                const stops = await res.json();
-                
-                const targetId = isRequest ? 'newStopId' : 'stopId';
-                const sel = document.getElementById(targetId);
-                
-                sel.innerHTML = `<option value="">-- Select ${isRequest ? 'New' : 'a'} Stop --</option>`;
-                stops.forEach(s => {
-                    sel.innerHTML += `<option value="${s.stop_id}">${s.stop_name}</option>`;
-                });
-                
-                if (!isRequest) stopsLoaded = true;
-            } catch (err) {
-                console.error(err);
-            }
-        }
 
         function logout() { localStorage.clear(); window.location.href = '/static/html/login.html'; }
         loadCurrent();

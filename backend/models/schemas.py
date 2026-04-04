@@ -62,7 +62,42 @@ class BusResponse(BaseModel):
         from_attributes = True
 
 
-# ─── Student ──────────────────────────────────────
+class PassTypeChoice(BaseModel):
+    allocation_type: str  # 'yearwise' or 'daywise'
+
+class DayPassAvailableBus(BaseModel):
+    bus_id: int
+    bus_number: str
+    route_name: str
+    available_seats: int
+
+class DayPassOrderResponse(BaseModel):
+    order_id: str
+    amount: int
+    currency: str = "INR"
+
+class DayPassConfirmRequest(BaseModel):
+    razorpay_payment_id: str
+    razorpay_order_id: str
+    razorpay_signature: str
+    stop_id: int
+    bus_id: int
+    date: str
+
+class DayPassResponse(BaseModel):
+    booking_id: int
+    student_name: str
+    roll_number: str
+    bus_number: str
+    route_name: str
+    stop_name: str
+    booking_date: str
+    pickup_time: str
+    status: str
+
+    class Config:
+        from_attributes = True
+
 class StudentSelectStop(BaseModel):
     bus_required: bool
     stop_id: Optional[int] = None
@@ -76,6 +111,7 @@ class StudentResponse(BaseModel):
     bus_required: bool
     stop_id: Optional[int] = None
     allocated_bus_id: Optional[int] = None
+    allocation_type: Optional[str] = None
 
     class Config:
         from_attributes = True

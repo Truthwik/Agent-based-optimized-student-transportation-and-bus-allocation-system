@@ -38,7 +38,11 @@
     </div>
 
     <script>
-        const API = '';
+        // Same host as this page when served by FastAPI; fallback if HTML opened from disk
+        const API_BASE =
+            window.location.protocol !== 'file:' && window.location.origin
+                ? window.location.origin
+                : 'http://127.0.0.1:8000';
 
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -48,39 +52,55 @@
             const username = document.getElementById('username').value.trim();
             const password = document.getElementById('password').value;
 
+            let res;
             try {
-                const res = await fetch(`${API}/auth/login`, {
+                res = await fetch(`${API_BASE}/auth/login`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ username, password })
                 });
-
-                const data = await res.json();
-
-                if (!res.ok) {
-                    alert.className = 'alert alert-error show';
-                    alert.textContent = data.detail || 'Login failed';
-                    return;
-                }
-
-                if (data.role === 'admin') {
-                    alert.className = 'alert alert-error show';
-                    alert.textContent = 'Please use the admin login page';
-                    return;
-                }
-
-                // Store credentials
-                localStorage.setItem('token', data.token);
-                localStorage.setItem('role', data.role);
-
-                if (!data.password_changed) {
-                    window.location.href = '/static/html/change-password.html';
-                } else {
-                    window.location.href = '/static/html/dashboard.html';
-                }
             } catch (err) {
                 alert.className = 'alert alert-error show';
-                alert.textContent = 'Connection error. Please try again.';
+                alert.textContent =
+                    'Cannot reach the server. Start MySQL, then run: python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000';
+                return;
+            }
+
+            const raw = await res.text();
+            let data;
+            try {
+                data = raw ? JSON.parse(raw) : {};
+            } catch (err) {
+                alert.className = 'alert alert-error show';
+                const hint = raw.replace(/\s+/g, ' ').trim().slice(0, 180);
+                alert.textContent =
+                    'Non-JSON response (HTTP ' +
+                    res.status +
+                    '). Often: MySQL off, wrong port, or another app on :8000. ' +
+                    (hint ? 'Preview: ' + hint : '');
+                return;
+            }
+
+            if (!res.ok) {
+                alert.className = 'alert alert-error show';
+                const msg = typeof data.detail === 'string' ? data.detail : (data.detail && JSON.stringify(data.detail)) || 'Login failed';
+                alert.textContent = msg;
+                return;
+            }
+
+            if (data.role === 'admin') {
+                alert.className = 'alert alert-error show';
+                alert.textContent = 'Please use the admin login page';
+                return;
+            }
+
+            localStorage.setItem('token', data.token);
+            localStorage.setItem('role', data.role);
+
+            if (!data.password_changed) {
+                window.location.href = '/static/html/change-password.html';
+            } else {
+                window.location.href = '/static/html/dashboard.html';
             }
         });
     </script>

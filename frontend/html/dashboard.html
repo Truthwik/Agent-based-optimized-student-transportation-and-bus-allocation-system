@@ -56,6 +56,47 @@
                     </a>
                 </div>
 
+                <!-- Day Pass Ticket -->
+                <div id="dayPassContainer" class="slide-up" style="animation-delay: 0.15s; display: none; margin-bottom: 24px;">
+                    <div class="glass-card ticket-card" style="border-left: 5px solid var(--primary-accent); position: relative; overflow: hidden;">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                            <div>
+                                <div class="badge badge-primary" style="margin-bottom: 12px;">ACTIVE DAY PASS 🎫</div>
+                                <h2 id="ticketBusNum" style="margin-bottom: 4px;">Bus #--</h2>
+                                <p id="ticketRouteName" class="subtitle" style="font-size: 0.9rem;">Route Details</p>
+                                
+                                <div style="margin-top: 20px; display: grid; gap: 12px;">
+                                    <div style="display: flex; align-items: center; gap: 10px;">
+                                        <span style="font-size: 1.2rem;">📍</span>
+                                        <div>
+                                            <span style="color: var(--text-secondary); font-size: 0.75rem; display: block;">PICKUP STOP</span>
+                                            <strong id="ticketStopName">--</strong>
+                                        </div>
+                                    </div>
+                                    <div style="display: flex; align-items: center; gap: 10px;">
+                                        <span style="font-size: 1.2rem;">⏰</span>
+                                        <div>
+                                            <span style="color: var(--text-secondary); font-size: 0.75rem; display: block;">PICKUP TIME</span>
+                                            <strong id="ticketTime">--</strong>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="qrcode" style="background: white; padding: 10px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);"></div>
+                        </div>
+                        <div style="margin-top: 24px; padding-top: 16px; border-top: 1px dashed var(--glass-border); display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <span style="color: var(--text-secondary); font-size: 0.75rem; display: block;">DATE</span>
+                                <strong id="ticketDate">--</strong>
+                            </div>
+                            <div style="text-align: right;">
+                                <span style="color: var(--text-secondary); font-size: 0.75rem; display: block;">BOOKING ID</span>
+                                <strong id="ticketId">#--</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Status Card -->
                 <div class="glass-card slide-up" style="animation-delay: 0.2s;">
                     <h3 style="margin-bottom: 16px;">📋 Your Status</h3>
@@ -78,6 +119,7 @@
         </div>
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script>
         const token = localStorage.getItem('token');
         if (!token || localStorage.getItem('role') !== 'student') {
@@ -110,9 +152,41 @@
                         if (stop) document.getElementById('stopStatus').textContent = stop.stop_name;
                     }
                 }
+
+                // Load Day Pass if exists
+                loadDayPass();
             } catch (err) {
                 console.error(err);
             }
+        }
+
+        async function loadDayPass() {
+            try {
+                const res = await fetch('/students/day-pass/current', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+
+                if (data) {
+                    document.getElementById('dayPassContainer').style.display = 'block';
+                    document.getElementById('ticketBusNum').textContent = `Bus #${data.bus_number}`;
+                    document.getElementById('ticketRouteName').textContent = data.route_name;
+                    document.getElementById('ticketStopName').textContent = data.stop_name;
+                    document.getElementById('ticketTime').textContent = data.pickup_time;
+                    document.getElementById('ticketDate').textContent = data.booking_date;
+                    document.getElementById('ticketId').textContent = `#${data.booking_id}`;
+
+                    // Generate QR Code
+                    new QRCode(document.getElementById("qrcode"), {
+                        text: `BVRIT-DAYPASS-${data.booking_id}`,
+                        width: 100,
+                        height: 100,
+                        colorDark : "#000000",
+                        colorLight : "#ffffff",
+                        correctLevel : QRCode.CorrectLevel.H
+                    });
+                }
+            } catch (err) {}
         }
 
         function logout() {

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Header
 from sqlalchemy.orm import Session
 import jwt
 from datetime import datetime, timedelta
@@ -24,24 +24,6 @@ def decode_token(token: str) -> dict:
         raise HTTPException(status_code=401, detail="Token expired")
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid token")
-
-
-def get_current_user(token: str, db: Session):
-    """Extract user from Bearer token."""
-    payload = decode_token(token)
-    role = payload.get("role")
-    user_id = payload.get("sub")
-
-    if role == "admin":
-        user = db.query(Admin).filter(Admin.username == user_id).first()
-    elif role == "student":
-        user = db.query(Student).filter(Student.student_id == user_id).first()
-    else:
-        raise HTTPException(status_code=401, detail="Invalid role")
-
-    if not user:
-        raise HTTPException(status_code=401, detail="User not found")
-    return user, role
 
 
 @router.post("/login", response_model=LoginResponse)
@@ -72,9 +54,12 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
 @router.post("/change-password")
 def change_password(
     req: ChangePasswordRequest,
-    token: str = "",
-    db: Session = Depends(get_db)
+    authorization: str = Header(..., alias="Authorization"),
+    db: Session = Depends(get_db),
 ):
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+    token = authorization.split(" ", 1)[1].strip()
     payload = decode_token(token)
     user_id = payload.get("sub")
     role = payload.get("role")
