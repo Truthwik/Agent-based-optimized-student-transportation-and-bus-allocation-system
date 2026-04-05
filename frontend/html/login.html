@@ -119,17 +119,19 @@
             localStorage.setItem('token', data.token);
             localStorage.setItem('role', data.role);
             if (data.bus_id) localStorage.setItem('bus_id', data.bus_id);
+            if (data.password_changed !== undefined) localStorage.setItem('password_changed', data.password_changed);
+
+            if (data.role === 'student' && data.password_changed === false) {
+                window.location.href = 'change-password.html';
+                return;
+            }
 
             if (data.role === 'driver') {
                 window.location.href = 'driver.html';
                 return;
             }
 
-            if (!data.password_changed) {
-                window.location.href = 'change-password.html';
-            } else {
-                window.location.href = 'dashboard.html';
-            }
+            window.location.href = 'dashboard.html';
         });
     </script>
 </body>

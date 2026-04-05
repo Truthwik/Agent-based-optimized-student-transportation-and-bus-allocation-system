@@ -5,7 +5,18 @@ from typing import List
 from datetime import datetime
 
 from backend.database import get_db
-from backend.models.models import Admin, Stop, Bus, Student, Route, RouteStop, Allocation, Coordinator, Announcement
+from backend.models.models import (
+    Admin,
+    Stop,
+    Bus,
+    Student,
+    Route,
+    RouteStop,
+    Allocation,
+    Coordinator,
+    Announcement,
+    StopChangeRequest,
+)
 from backend.models.schemas import (
     StopCreate, StopUpdate, StopResponse,
     BusCreate, BusUpdate, BusResponse,
@@ -140,7 +151,8 @@ def get_routes(db: Session = Depends(get_db), admin=Depends(verify_admin)):
                 stop_id=rs.stop.stop_id,
                 stop_name=rs.stop.stop_name,
                 latitude=rs.stop.latitude,
-                longitude=rs.stop.longitude
+                longitude=rs.stop.longitude,
+                scheduled_departure=rs.scheduled_departure,
             ))
         result.append(RouteResponse(
             route_id=route.route_id,
@@ -250,7 +262,6 @@ def delete_coordinator(id: int, db: Session = Depends(get_db), admin=Depends(ver
 
 
 # ─── STOP CHANGE REQUESTS ─────────────────────────
-from ..models.models import StopChangeRequest, RouteStop, Route, Allocation
 
 @router.get("/stop-change-requests")
 def get_stop_change_requests(db: Session = Depends(get_db), admin=Depends(verify_admin)):

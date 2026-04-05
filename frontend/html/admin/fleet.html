@@ -48,6 +48,17 @@
 
             L.control.zoom({ position: 'topright' }).addTo(map);
 
+            // Campus Building Marker
+            const campusIcon = L.divIcon({
+                html: '<div style="font-size:28px; filter:drop-shadow(0 2px 4px rgba(0,0,0,0.3))">🏢</div>',
+                className: '',
+                iconSize: [30, 30],
+                iconAnchor: [15, 15]
+            });
+            L.marker([17.7252, 78.2571], { icon: campusIcon })
+                .addTo(map)
+                .bindPopup('<b>BVRIT Campus</b>');
+
             updateFleet();
             setInterval(updateFleet, 10000);
         }

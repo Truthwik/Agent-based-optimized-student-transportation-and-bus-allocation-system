@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Header
+from fastapi import APIRouter, Depends, HTTPException, Header, Response
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import Optional, List, Any
@@ -13,6 +13,7 @@ from ..models.schemas import (
     StopChangeRequestCreate, StopChangeRequestResponse
 )
 from ..config import RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, DAY_PASS_FARE
+from ..services.route_schedule import scheduled_departure_at_stop
 from .auth import decode_token
 
 _rzp_client: Any = None
@@ -55,6 +56,7 @@ def get_profile(student: Student = Depends(verify_student), db: Session = Depend
         bus = db.query(Bus).filter(Bus.bus_id == student.allocated_bus_id).first()
         if bus:
             student.allocated_bus_number = bus.bus_number
+            
     return student
 
 
@@ -136,13 +138,20 @@ def get_allocation(db: Session = Depends(get_db), student: Student = Depends(ver
 
 
 @router.get("/bus-pass", response_model=Optional[BusPassResponse])
-def get_bus_pass(db: Session = Depends(get_db), student: Student = Depends(verify_student)):
+def get_bus_pass(
+    response: Response,
+    db: Session = Depends(get_db),
+    student: Student = Depends(verify_student),
+):
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
     # 1. Check for permanent allocation
     allocation = db.query(Allocation).filter(Allocation.student_id == student.student_id).first()
     
     if allocation:
         bus = db.query(Bus).filter(Bus.bus_id == allocation.bus_id).first()
         stop = db.query(Stop).filter(Stop.stop_id == student.stop_id).first()
+        dep = scheduled_departure_at_stop(db, allocation.bus_id, student.stop_id)
 
         return BusPassResponse(
             student_name=student.name,
@@ -154,7 +163,7 @@ def get_bus_pass(db: Session = Depends(get_db), student: Student = Depends(verif
             bus_number=bus.bus_number if bus else "N/A",
             driver_name=bus.driver_name if bus else None,
             driver_phone=bus.driver_phone if bus else None,
-            reporting_time="7:00 AM"
+            reporting_time=dep or "Not scheduled — contact transport office",
         )
 
     # 2. Check for active Day Pass
@@ -168,7 +177,9 @@ def get_bus_pass(db: Session = Depends(get_db), student: Student = Depends(verif
     if day_pass:
         bus = db.query(Bus).filter(Bus.bus_id == day_pass.bus_id).first()
         stop = db.query(Stop).filter(Stop.stop_id == day_pass.stop_id).first()
-        
+        dep = scheduled_departure_at_stop(db, day_pass.bus_id, day_pass.stop_id)
+        rep = f"{dep} (Day Pass)" if dep else "Not scheduled — contact transport office (Day Pass)"
+
         return BusPassResponse(
             student_name=student.name,
             roll_number=student.student_id,
@@ -179,7 +190,7 @@ def get_bus_pass(db: Session = Depends(get_db), student: Student = Depends(verif
             bus_number=bus.bus_number if bus else "N/A",
             driver_name=bus.driver_name if bus else None,
             driver_phone=bus.driver_phone if bus else None,
-            reporting_time="7:15 AM (Day Pass)"
+            reporting_time=rep,
         )
 
     return None
@@ -214,7 +225,8 @@ def get_my_route(db: Session = Depends(get_db), student: Student = Depends(verif
             stop_id=rs.stop.stop_id,
             stop_name=rs.stop.stop_name,
             latitude=rs.stop.latitude,
-            longitude=rs.stop.longitude
+            longitude=rs.stop.longitude,
+            scheduled_departure=rs.scheduled_departure,
         ))
     
     return RouteResponse(
@@ -275,11 +287,13 @@ def get_available_buses(
         available = bus.capacity - (permanent_count + day_pass_booked)
 
         if available > 0:
+            dep = scheduled_departure_at_stop(db, bus.bus_id, stop_id)
             available_buses.append(DayPassAvailableBus(
                 bus_id=bus.bus_id,
                 bus_number=bus.bus_number,
                 route_name=f"Route {route.route_id}",
-                available_seats=available
+                available_seats=available,
+                pickup_time=dep,
             ))
 
     return available_buses
@@ -406,6 +420,8 @@ def get_current_day_pass(
     stop = db.query(Stop).filter(Stop.stop_id == booking.stop_id).first()
     route = db.query(Route).filter(Route.bus_id == bus.bus_id).first()
 
+    dep = scheduled_departure_at_stop(db, booking.bus_id, booking.stop_id)
+
     return DayPassResponse(
         booking_id=booking.id,
         student_name=student.name,
@@ -414,7 +430,7 @@ def get_current_day_pass(
         route_name=f"Route {route.route_id}" if route else "N/A",
         stop_name=stop.stop_name,
         booking_date=booking.booking_date,
-        pickup_time="7:15 AM", # In real app, fetch from RouteStop ETA
+        pickup_time=dep or "Not scheduled",
         status=booking.status
     )
 

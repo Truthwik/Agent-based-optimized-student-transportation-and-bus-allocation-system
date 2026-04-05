@@ -88,12 +88,12 @@
         }
 
         function initMap(stops) {
-            map = L.map('map', { zoomControl: false }).setView([17.5218, 78.5542], 12);
+            map = L.map('map', { zoomControl: false }).setView([17.7252, 78.2571], 12);
             L.control.zoom({ position: 'topright' }).addTo(map);
             L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
 
-            const collegeIcon = L.divIcon({ html: `<div style="font-size:32px; transform:translate(-10px,-20px)">🏫</div>`, className: '' });
-            L.marker([17.5218, 78.5542], { icon: collegeIcon }).addTo(map).bindPopup('<b>BVRIT Campus</b>');
+            const collegeIcon = L.divIcon({ html: `<div style="font-size:32px; filter:drop-shadow(0 2px 4px rgba(0,0,0,0.3))">🏢</div>`, className: '', iconSize: [36, 36], iconAnchor: [18, 18] });
+            L.marker([17.7252, 78.2571], { icon: collegeIcon }).addTo(map).bindPopup('<b>BVRIT Campus</b>');
 
             const latlngs = [];
             stops.forEach((stop, index) => {
@@ -103,14 +103,14 @@
                     icon: L.divIcon({ html: `<div style="background:var(--accent-blue);color:white;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:bold;border:2px solid white;">${index+1}</div>`, className: '' })
                 }).addTo(map);
             });
-            latlngs.push([17.5218, 78.5542]);
+            latlngs.push([17.7252, 78.2571]);
             if(latlngs.length > 1) L.polyline(latlngs, { color: '#3b82f6', weight: 4, opacity: 0.5, dashArray: '10, 10' }).addTo(map);
             
             const bIcon = L.divIcon({
                 html: `<div style="font-size:36px; transform:translate(-15px,-15px)">🚌</div>`,
                 className: 'bus-marker'
             });
-            busMarker = L.marker([17.5218, 78.5542], { icon: bIcon }).addTo(map).setOpacity(0);
+            busMarker = L.marker([17.7252, 78.2571], { icon: bIcon }).addTo(map).setOpacity(0);
         }
 
         function connectWebSocket() {

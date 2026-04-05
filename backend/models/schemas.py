@@ -11,8 +11,8 @@ class LoginRequest(BaseModel):
 class LoginResponse(BaseModel):
     token: str
     role: str
-    password_changed: Optional[bool] = None
     bus_id: Optional[int] = None
+    password_changed: Optional[bool] = None
 
 class ChangePasswordRequest(BaseModel):
     old_password: str
@@ -72,6 +72,7 @@ class DayPassAvailableBus(BaseModel):
     bus_number: str
     route_name: str
     available_seats: int
+    pickup_time: Optional[str] = None  # scheduled departure at chosen stop, if known
 
 class DayPassOrderResponse(BaseModel):
     order_id: str
@@ -145,6 +146,7 @@ class RouteStopResponse(BaseModel):
     stop_name: str
     latitude: float
     longitude: float
+    scheduled_departure: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -173,7 +175,7 @@ class BusPassResponse(BaseModel):
     bus_number: str
     driver_name: Optional[str] = None
     driver_phone: Optional[str] = None
-    reporting_time: str = "7:00 AM"
+    reporting_time: str
 
 
 # ─── Coordinator ───────────────────────────────────

@@ -51,7 +51,7 @@
         async function loadPass() {
             const content = document.getElementById('passContent');
             try {
-                const res = await fetch('/students/bus-pass', {
+                const res = await fetch(`/students/bus-pass?t=${Date.now()}`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
 
@@ -114,7 +114,7 @@
                                 <span>${data.driver_phone || 'N/A'}</span>
                             </div>
                             <div class="pass-field">
-                                <label>Reporting Time</label>
+                                <label>Bus Arrival at Stop</label>
                                 <span style="color: var(--accent-green);">${data.reporting_time}</span>
                             </div>
                         </div>

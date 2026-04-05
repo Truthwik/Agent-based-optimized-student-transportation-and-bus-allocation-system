@@ -97,7 +97,8 @@ def get_driver_route(driver=Depends(get_current_driver), db: Session = Depends(g
             "stop_order": rs.stop_order,
             "stop_name": rs.stop.stop_name,
             "latitude": rs.stop.latitude,
-            "longitude": rs.stop.longitude
+            "longitude": rs.stop.longitude,
+            "scheduled_departure": rs.scheduled_departure,
         })
     return {
         "route_id": route.route_id,

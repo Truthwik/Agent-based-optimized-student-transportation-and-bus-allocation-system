@@ -81,6 +81,8 @@ class RouteStop(Base):
     route_id = Column(Integer, ForeignKey("routes.route_id"), nullable=False)
     stop_id = Column(Integer, ForeignKey("stops.stop_id"), nullable=False)
     stop_order = Column(Integer, nullable=False)
+    # Set by optimizer (backward ETA from campus window); e.g. "08:30 AM"
+    scheduled_departure = Column(String(20), nullable=True)
 
     route = relationship("Route", back_populates="route_stops")
     stop = relationship("Stop", back_populates="route_stops")

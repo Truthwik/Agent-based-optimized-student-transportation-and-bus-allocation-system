@@ -953,7 +953,8 @@ def run_optimizer(db: Session) -> Dict[str, Any]:
             rs = RouteStop(
                 route_id=route.route_id,
                 stop_id=sid,
-                stop_order=order
+                stop_order=order,
+                scheduled_departure=departure_times[order - 1],
             )
             db.add(rs)
 

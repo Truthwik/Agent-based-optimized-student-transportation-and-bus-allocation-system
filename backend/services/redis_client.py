@@ -16,9 +16,10 @@ try:
     _client = _redis.from_url(REDIS_URL, decode_responses=True, socket_connect_timeout=2)
     _client.ping()  # Test connection
     redis_client = _client
-    print("[GPS] ✅ Redis connected successfully.")
+    print("[GPS] Redis connected successfully.")
 except Exception as e:
-    print(f"[GPS] ⚠️  Redis unavailable ({e}). Using in-memory fallback — WebSocket live map disabled.")
+    # ASCII-only: Windows cp1252 consoles choke on emoji in tracebacks
+    print(f"[GPS] Redis unavailable ({e!s}). Using in-memory fallback; live map disabled.")
 
 
 def _mem_get(key):

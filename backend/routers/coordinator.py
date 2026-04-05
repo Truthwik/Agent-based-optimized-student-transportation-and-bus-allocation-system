@@ -6,7 +6,8 @@ import json
 import asyncio
 
 from backend.database import get_db
-from backend.models.models import Coordinator, Bus, Student, Allocation, DayPassBooking, Route, RouteStop, Announcement, Complaint
+from backend.models.models import Coordinator, Bus, Student, Allocation, DayPassBooking, Route, RouteStop, Stop, Announcement, Complaint
+from backend.services.route_schedule import scheduled_departure_at_stop
 from backend.models.schemas import (
     CoordinatorDashboardResponse, CoordinatorDashboardBus, CoordinatorDashboardSummary,
     CoordinatorResponse, StudentResponse, RouteResponse, RouteStopResponse,
@@ -107,6 +108,7 @@ def get_students(search: str = None, year: int = None, stop_id: int = None, sort
     students = query.all()
     results = []
     for s in students:
+        dep = scheduled_departure_at_stop(db, coordinator.bus_id, s.stop_id)
         results.append({
             "id": s.student_id,
             "name": s.name,
@@ -114,7 +116,7 @@ def get_students(search: str = None, year: int = None, stop_id: int = None, sort
             "year_of_study": s.year,
             "phone": s.phone,
             "stop_name": s.stop.stop_name if s.stop else "Unknown",
-            "pickup_time": "08:10:00", # Can be fetched from route mapping
+            "pickup_time": dep or "—",
             "allocation_status": "active"
         })
     return results
@@ -146,12 +148,15 @@ def get_daypass_today(db: Session = Depends(get_db), coordinator: Coordinator = 
     results = []
     for b in bookings:
         student = b.student
+        stop = db.query(Stop).filter(Stop.stop_id == b.stop_id).first()
+        dep = scheduled_departure_at_stop(db, coordinator.bus_id, b.stop_id)
         results.append({
             "booking_id": b.id,
             "student_name": student.name if student else "Unknown",
             "roll_number": student.student_id if student else "Unknown",
             "year_of_study": student.year if student else "-",
-            "stop_name": "Mapped Stop", # Needs logic to get stop name
+            "stop_name": stop.stop_name if stop else "Unknown",
+            "pickup_time": dep or "—",
             "payment_id": b.razorpay_payment_id,
             "status": b.status
         })
@@ -171,7 +176,7 @@ def get_route(db: Session = Depends(get_db), coordinator: Coordinator = Depends(
             "stop_name": rs.stop.stop_name,
             "latitude": rs.stop.latitude,
             "longitude": rs.stop.longitude,
-            "pickup_time": "08:10:00",
+            "pickup_time": rs.scheduled_departure or "—",
             "student_count": db.query(Student).filter(Student.stop_id == rs.stop.stop_id).count()
         })
     

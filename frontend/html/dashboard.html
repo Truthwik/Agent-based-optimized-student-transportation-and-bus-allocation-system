@@ -164,6 +164,9 @@
         if (!token || localStorage.getItem('role') !== 'student') {
             window.location.href = '/static/html/login.html';
         }
+        if (localStorage.getItem('password_changed') === 'false') {
+            window.location.href = '/static/html/change-password.html';
+        }
 
         async function loadProfile() {
             try {

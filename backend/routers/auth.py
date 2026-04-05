@@ -45,7 +45,7 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
         return LoginResponse(
             token=token,
             role="student",
-            password_changed=(student.password != student.student_id)
+            password_changed=(student.password != 'bvrit123')
         )
 
     # Try driver login
@@ -56,7 +56,6 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
             token=token,
             role="driver",
             bus_id=bus.bus_id,
-            password_changed=True
         )
 
     # Try coordinator login
@@ -69,7 +68,6 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
             token=token,
             role="coordinator",
             bus_id=coordinator.bus_id,
-            password_changed=coordinator.password_changed
         )
 
     raise HTTPException(status_code=401, detail="Invalid ID or Password")

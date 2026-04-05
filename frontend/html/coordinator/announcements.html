@@ -101,7 +101,6 @@
                         <p style="margin:0 0 16px 0; color:var(--text-secondary)">${a.message}</p>
                         <div style="display:flex; justify-content:space-between; align-items:flex-end; font-size:0.8rem; color:var(--text-secondary)">
                             <div>
-                                <div>Posted: ${new Date(a.created_at).toLocaleString()}</div>
                                 <div style="margin-top:2px">Expires: ${exp.toLocaleString()}</div>
                             </div>
                             ${!isPassed && a.is_active ? `<button class="btn btn-secondary btn-sm" style="color:#ef4444; border-color:#ef4444" onclick="deleteAnnouncement(${a.id})">Delete</button>` : ''}

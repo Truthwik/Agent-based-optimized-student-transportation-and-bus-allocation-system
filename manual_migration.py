@@ -1,3 +1,8 @@
+"""
+One-off DDL for older deployments (ALTER / CREATE IF NOT EXISTS).
+To add the column and fill NULL scheduled_departure values in one go, use:
+    python migrate_and_backfill.py
+"""
 import sys
 import os
 from sqlalchemy import text
@@ -58,6 +63,16 @@ def migrate():
             print("Created bus_daily_capacity table.")
         except Exception as e:
             print(f"Error creating bus_daily_capacity: {e}")
+
+        # 4. Scheduled departure at each route stop (optimizer / bus pass)
+        try:
+            conn.execute(text(
+                "ALTER TABLE route_stops ADD COLUMN scheduled_departure VARCHAR(20) DEFAULT NULL"
+            ))
+            conn.commit()
+            print("Added route_stops.scheduled_departure column.")
+        except Exception as e:
+            print(f"Skipping route_stops.scheduled_departure: {e}")
             
         print("Migration complete.")
 
