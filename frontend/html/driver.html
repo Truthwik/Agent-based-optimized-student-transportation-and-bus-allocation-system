@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Driver Dashboard | BVRIT Smart Bus</title>
+    <link rel="stylesheet" href="/static/css/style.css?v=1.3">
+</head>
+<body>
+    <div class="page-wrapper">
+        <!-- Navbar -->
+        <nav class="navbar">
+            <div class="container">
+                <div class="navbar-brand">
+                    <img class="logo-img" src="/static/img/logo.png" alt="Vishnu Logo" width="36" height="36" style="border-radius: 8px; vertical-align: middle; margin-right: 8px;">
+                    BVRIT Smart Bus
+                </div>
+                <ul class="navbar-links">
+                    <li><a href="#" onclick="showTab('dashboard')" id="nav-dashboard" class="active">Dashboard</a></li>
+                    <li><a href="#" onclick="showTab('route')" id="nav-route">My Route</a></li>
+                    <li><a href="#" onclick="showTab('password')" id="nav-password">Change Password</a></li>
+                    <li><a href="#" class="btn-logout" onclick="logout()">Logout</a></li>
+                </ul>
+            </div>
+        </nav>
+
+        <div class="dashboard-content">
+            <div class="container">
+                <div class="page-header slide-up">
+                    <h1>🚌 Bus <span id="busLabel">--</span> &nbsp;<span id="statusBadge" class="badge badge-warning">OFFLINE</span></h1>
+                    <p class="subtitle">Driver Dashboard — <span id="driverOnlineText">Start your trip to begin broadcasting GPS</span></p>
+                </div>
+
+                <!-- ── Dashboard Tab ── -->
+                <div id="tab-dashboard">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px;" class="slide-up" style="animation-delay:0.1s">
+                        <div class="glass-card" style="text-align:center;">
+                            <div style="color: var(--text-secondary); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">📍 Latitude</div>
+                            <div id="lat" style="font-size: 1.2rem; font-weight: 700;">--</div>
+                        </div>
+                        <div class="glass-card" style="text-align:center;">
+                            <div style="color: var(--text-secondary); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">📍 Longitude</div>
+                            <div id="lng" style="font-size: 1.2rem; font-weight: 700;">--</div>
+                        </div>
+                        <div class="glass-card" style="text-align:center;">
+                            <div style="color: var(--text-secondary); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">🚀 Speed</div>
+                            <div id="speed" style="font-size: 1.2rem; font-weight: 700;">0 km/h</div>
+                        </div>
+                        <div class="glass-card" style="text-align:center;">
+                            <div style="color: var(--text-secondary); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">📡 Pings Sent</div>
+                            <div id="pingCount" style="font-size: 1.2rem; font-weight: 700;">0</div>
+                        </div>
+                    </div>
+
+                    <div class="glass-card slide-up" style="animation-delay:0.2s; display: flex; gap: 16px; flex-wrap: wrap;">
+                        <button id="startBtn" class="btn btn-primary" style="flex:1; padding: 18px; font-size: 1rem; font-weight: 700;" onclick="startTrip()">
+                            ▶ START TRIP
+                        </button>
+                        <button id="endBtn" class="btn btn-danger" style="flex:1; padding: 18px; font-size: 1rem; font-weight: 700; display:none;" onclick="endTrip()">
+                            ■ END TRIP
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ── Route Tab ── -->
+                <div id="tab-route" style="display:none;">
+                    <div id="routeContent" class="slide-up">
+                        <div class="glass-card" style="text-align:center; padding: 40px; color: var(--text-secondary);">
+                            Loading route...
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── Change Password Tab ── -->
+                <div id="tab-password" style="display:none;">
+                    <div class="glass-card slide-up" style="max-width: 480px;">
+                        <h3 style="margin-bottom: 20px;">🔑 Change Password</h3>
+
+                        <div id="pwAlert" class="alert"></div>
+
+                        <div class="premium-input-group">
+                            <label>Current Phone Number (Old Password)</label>
+                            <input type="password" id="oldPw" placeholder="Your current phone number">
+                        </div>
+                        <div class="premium-input-group">
+                            <label>New Password</label>
+                            <input type="password" id="newPw" placeholder="Enter new password">
+                        </div>
+                        <div class="premium-input-group" style="margin-bottom: 20px;">
+                            <label>Confirm New Password</label>
+                            <input type="password" id="confirmPw" placeholder="Repeat new password">
+                        </div>
+                        <button class="btn btn-primary btn-block" onclick="changePassword()">Save New Password</button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const token   = localStorage.getItem('token');
+        const role    = localStorage.getItem('role');
+        const busId   = localStorage.getItem('bus_id');
+        const busNum  = localStorage.getItem('username');
+
+        if (!token || role !== 'driver') window.location.href = '/static/html/driver-login.html';
+
+        document.getElementById('busLabel').textContent = busNum || busId || '?';
+
+        let isTripActive = false;
+        let watchId = null;
+        let pingsSent = 0;
+
+        // ── Tab switching ─────────────────────────────────────
+        const navIds = ['nav-dashboard', 'nav-route', 'nav-password'];
+        const tabIds = ['tab-dashboard', 'tab-route', 'tab-password'];
+
+        function showTab(name) {
+            tabIds.forEach(id => document.getElementById(id).style.display = 'none');
+            navIds.forEach(id => document.getElementById(id).classList.remove('active'));
+
+            document.getElementById('tab-' + name).style.display = 'block';
+            document.getElementById('nav-' + name).classList.add('active');
+
+            if (name === 'route') loadRoute();
+        }
+
+        // ── Status helpers ────────────────────────────────────
+        function setOnline() {
+            const badge = document.getElementById('statusBadge');
+            badge.className = 'badge badge-success';
+            badge.textContent = 'LIVE';
+            document.getElementById('driverOnlineText').textContent = 'Broadcasting GPS — students can track you';
+        }
+
+        function setOffline() {
+            const badge = document.getElementById('statusBadge');
+            badge.className = 'badge badge-warning';
+            badge.textContent = 'OFFLINE';
+            document.getElementById('driverOnlineText').textContent = 'Start your trip to begin broadcasting GPS';
+        }
+
+        // ── Trip Control ──────────────────────────────────────
+        async function startTrip() {
+            const btn = document.getElementById('startBtn');
+            btn.textContent = 'Starting...';
+            btn.disabled = true;
+            try {
+                const res = await fetch('/driver/trip/start', {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+                if (!res.ok) {
+                    const d = await res.json();
+                    alert(d.detail || 'Failed to start trip');
+                    btn.textContent = '▶ START TRIP';
+                    btn.disabled = false;
+                    return;
+                }
+                isTripActive = true;
+                pingsSent = 0;
+                document.getElementById('pingCount').textContent = '0';
+                document.getElementById('startBtn').style.display = 'none';
+                document.getElementById('endBtn').style.display = 'block';
+                setOnline();
+                startGeolocation();
+            } catch (err) {
+                alert('Connection error. Make sure the server is running.');
+                btn.textContent = '▶ START TRIP';
+                btn.disabled = false;
+            }
+        }
+
+        async function endTrip() {
+            if (!confirm('Are you sure you want to end the trip?')) return;
+            try {
+                await fetch('/driver/trip/end', {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+            } catch(_) {}
+            isTripActive = false;
+            if (watchId != null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+            document.getElementById('startBtn').style.display = 'block';
+            document.getElementById('startBtn').textContent = '▶ START TRIP';
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('endBtn').style.display = 'none';
+            setOffline();
+        }
+
+        // ── Geolocation ───────────────────────────────────────
+        function startGeolocation() {
+            if (!navigator.geolocation) {
+                alert('GPS not supported by this browser.');
+                return;
+            }
+            watchId = navigator.geolocation.watchPosition(
+                pos => {
+                    const d = {
+                        bus_id: parseInt(busId),
+                        latitude:  pos.coords.latitude,
+                        longitude: pos.coords.longitude,
+                        speed_kmh: pos.coords.speed ? +(pos.coords.speed * 3.6).toFixed(1) : 0,
+                        accuracy_meters: +pos.coords.accuracy.toFixed(1)
+                    };
+                    document.getElementById('lat').textContent   = d.latitude.toFixed(5);
+                    document.getElementById('lng').textContent   = d.longitude.toFixed(5);
+                    document.getElementById('speed').textContent = d.speed_kmh + ' km/h';
+                    sendLocation(d);
+                },
+                err => {
+                    if (err.code === 1) alert('GPS denied. Allow location access in your browser settings.');
+                },
+                { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 }
+            );
+        }
+
+        async function sendLocation(data) {
+            try {
+                const res = await fetch('/driver/location', {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                if (res.ok) {
+                    pingsSent++;
+                    document.getElementById('pingCount').textContent = pingsSent;
+                }
+            } catch(_) {}
+        }
+
+        // ── Route Tab ─────────────────────────────────────────
+        async function loadRoute() {
+            const container = document.getElementById('routeContent');
+            try {
+                const res = await fetch('/driver/route', {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+                const data = await res.json();
+
+                if (!data.stops || data.stops.length === 0) {
+                    container.innerHTML = `
+                        <div class="glass-card" style="text-align:center; padding: 40px;">
+                            <div style="font-size: 2.5rem; margin-bottom: 12px;">🗺️</div>
+                            <h3>No Route Assigned Yet</h3>
+                            <p class="subtitle">Admin needs to run the optimizer to assign your route.</p>
+                        </div>`;
+                    return;
+                }
+
+                container.innerHTML = `
+                    <div class="glass-card" style="margin-bottom: 16px;">
+                        <h3 style="margin-bottom: 16px;">📋 Route Summary</h3>
+                        <div style="display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; text-align: center;">
+                            <div>
+                                <div style="color: var(--text-secondary); font-size: 0.75rem; text-transform:uppercase;">Stops</div>
+                                <div style="font-size: 1.5rem; font-weight: 700;">${data.total_stops}</div>
+                            </div>
+                            <div>
+                                <div style="color: var(--text-secondary); font-size: 0.75rem; text-transform:uppercase;">Students</div>
+                                <div style="font-size: 1.5rem; font-weight: 700;">${data.total_students}</div>
+                            </div>
+                            <div>
+                                <div style="color: var(--text-secondary); font-size: 0.75rem; text-transform:uppercase;">Distance</div>
+                                <div style="font-size: 1.5rem; font-weight: 700;">${data.total_distance} km</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="glass-card">
+                        <h3 style="margin-bottom: 16px;">🛑 Stop Sequence</h3>
+                        <div style="display: flex; flex-direction: column; gap: 0;">
+                            ${data.stops.map((s, i) => `
+                                <div style="display:flex; align-items:center; gap: 14px; padding: 12px 0; ${i < data.stops.length - 1 ? 'border-bottom: 1px solid var(--glass-border);' : ''}">
+                                    <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--primary-accent),#6366f1);display:flex;align-items:center;justify-content:center;font-size:0.8rem;font-weight:700;flex-shrink:0;">${s.stop_order}</div>
+                                    <span style="font-weight: 500;">${s.stop_name}</span>
+                                </div>
+                            `).join('')}
+                            <div style="display:flex; align-items:center; gap: 14px; padding: 12px 0; margin-top:4px; border-top: 2px dashed var(--glass-border);">
+                                <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#f59e0b,#ef4444);display:flex;align-items:center;justify-content:center;font-size:0.9rem;flex-shrink:0;">🏫</div>
+                                <span style="font-weight: 700; color: #fbbf24;">BVRIT Campus (Final Destination)</span>
+                            </div>
+                        </div>
+                    </div>`;
+            } catch(err) {
+                container.innerHTML = '<div class="glass-card" style="color:#f87171;">Failed to load route. Please try again.</div>';
+            }
+        }
+
+        // ── Change Password ───────────────────────────────────
+        async function changePassword() {
+            const alertEl = document.getElementById('pwAlert');
+            alertEl.className = 'alert';
+
+            const oldPw  = document.getElementById('oldPw').value;
+            const newPw  = document.getElementById('newPw').value;
+            const confPw = document.getElementById('confirmPw').value;
+
+            if (!oldPw || !newPw || !confPw) {
+                alertEl.className = 'alert alert-error show';
+                alertEl.textContent = 'All fields are required.';
+                return;
+            }
+            if (newPw !== confPw) {
+                alertEl.className = 'alert alert-error show';
+                alertEl.textContent = 'New passwords do not match.';
+                return;
+            }
+            try {
+                const res = await fetch('/auth/change-password', {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ old_password: oldPw, new_password: newPw })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    alertEl.className = 'alert alert-success show';
+                    alertEl.textContent = '✅ Password changed successfully!';
+                    document.getElementById('oldPw').value = '';
+                    document.getElementById('newPw').value = '';
+                    document.getElementById('confirmPw').value = '';
+                } else {
+                    alertEl.className = 'alert alert-error show';
+                    alertEl.textContent = data.detail || 'Failed to change password.';
+                }
+            } catch(_) {
+                alertEl.className = 'alert alert-error show';
+                alertEl.textContent = 'Connection error.';
+            }
+        }
+
+        function logout() {
+            if (isTripActive) endTrip();
+            localStorage.clear();
+            window.location.href = '/static/html/driver-login.html';
+        }
+    </script>
+</body>
+</html>

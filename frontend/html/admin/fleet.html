@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fleet Tracking | Admin Portal</title>
+    <link rel="stylesheet" href="../../css/style.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        #map { height: 100vh; width: 100%; position: absolute; top: 0; left: 0; }
+        .admin-sidebar {
+            position: absolute; top: 20px; left: 20px; z-index: 1000;
+            background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px);
+            padding: 20px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 250px;
+        }
+        .bus-marker-label {
+            background: white; border: 1px solid #ccc; padding: 2px 5px; border-radius: 4px;
+            font-size: 10px; font-weight: bold; white-space: nowrap; margin-top: -35px; margin-left: -5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-sidebar slide-right">
+        <h2 style="margin: 0; font-size: 1.1rem;">Fleet Monitor</h2>
+        <p style="font-size: 0.8rem; color: #64748b; margin: 5px 0 15px;">Live bus tracking</p>
+        <div id="fleetStats">
+            <p>Active Buses: <b id="activeCount">0</b></p>
+            <p>Disconnected: <b id="disconnectedCount" style="color: #ef4444;">0</b></p>
+        </div>
+        <button onclick="window.location.href='../admin-dashboard.html'" class="btn btn-outline" style="width: 100%; margin-top: 10px; padding: 8px;">Back to Dashboard</button>
+    </div>
+
+    <div id="map"></div>
+
+    <script>
+        const token = localStorage.getItem('token');
+        if (!token) window.location.href = '../login.html';
+
+        let map;
+        let busMarkers = {};
+
+        function initMap() {
+            map = L.map('map', { zoomControl: false }).setView([17.7252, 78.2571], 12);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap'
+            }).addTo(map);
+
+            L.control.zoom({ position: 'topright' }).addTo(map);
+
+            updateFleet();
+            setInterval(updateFleet, 10000);
+        }
+
+        async function updateFleet() {
+            try {
+                const res = await fetch(`/tracking/fleet?token=${token}`);
+                const buses = await res.json();
+                
+                let active = 0;
+                let disconnected = 0;
+
+                buses.forEach(data => {
+                    const busId = data.bus_id;
+                    const pos = [data.latitude, data.longitude];
+                    
+                    // Simple logic to detect if data is stale (time-based)
+                    const now = new Date();
+                    const [hh, mm, ss] = data.updated_at.split(':');
+                    const lastUpdateTime = new Date();
+                    lastUpdateTime.setHours(hh, mm, ss);
+                    
+                    const secondsSinceUpdate = (now - lastUpdateTime) / 1000;
+                    const isStale = secondsSinceUpdate > 120; // 2 minutes
+
+                    if (isStale) disconnected++; else active++;
+
+                    const markerColor = isStale ? '#ef4444' : '#22c55e';
+                    const icon = L.divIcon({
+                        html: `<div style="background: ${markerColor}; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 5px rgba(0,0,0,0.3);"></div>
+                               <div class="bus-marker-label">${data.bus_number}</div>`,
+                        className: 'bus-marker', iconSize: [12, 12]
+                    });
+
+                    if (busMarkers[busId]) {
+                        busMarkers[busId].setLatLng(pos).setIcon(icon);
+                    } else {
+                        busMarkers[busId] = L.marker(pos, { icon }).addTo(map)
+                            .bindPopup(`<b>Bus ${data.bus_number}</b><br>Speed: ${data.speed_kmh} km/h<br>Last updated: ${data.updated_at}`);
+                    }
+                });
+
+                document.getElementById('activeCount').textContent = active;
+                document.getElementById('disconnectedCount').textContent = disconnected;
+
+                // Cleanup removed buses
+                const currentIds = buses.map(b => b.bus_id.toString());
+                Object.keys(busMarkers).forEach(id => {
+                    if (!currentIds.includes(id)) {
+                        map.removeLayer(busMarkers[id]);
+                        delete busMarkers[id];
+                    }
+                });
+
+            } catch (err) {
+                console.error('Fleet update error:', err);
+            }
+        }
+
+        initMap();
+    </script>
+</body>
+</html>

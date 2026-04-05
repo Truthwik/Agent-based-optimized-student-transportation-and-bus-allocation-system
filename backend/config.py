@@ -64,3 +64,8 @@ OSRM_MAX_RETRIES = int(os.getenv("OSRM_MAX_RETRIES", "2"))   # retry before Have
 RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID", "")
 RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET", "")
 DAY_PASS_FARE = int(os.getenv("DAY_PASS_FARE", "50"))
+
+# Tracking Configuration
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
+GPS_PING_INTERVAL_SECONDS = int(os.getenv("GPS_PING_INTERVAL_SECONDS", "8"))
+GEOFENCE_RADIUS_METERS = int(os.getenv("GEOFENCE_RADIUS_METERS", "500"))

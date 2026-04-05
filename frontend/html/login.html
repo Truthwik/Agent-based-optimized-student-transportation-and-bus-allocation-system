@@ -37,6 +37,9 @@
                 <div style="margin-top: 24px; font-size: 0.85rem; color: var(--text-secondary);">
                     Employee? <a href="admin-login.html">Login here</a>
                 </div>
+                <div style="margin-top: 10px; font-size: 0.85rem; color: var(--text-secondary);">
+                    Bus Driver? <a href="driver-login.html">Login here</a>
+                </div>
             </div>
         </div>
     </div>
@@ -110,6 +113,12 @@
 
             localStorage.setItem('token', data.token);
             localStorage.setItem('role', data.role);
+            if (data.bus_id) localStorage.setItem('bus_id', data.bus_id);
+
+            if (data.role === 'driver') {
+                window.location.href = 'driver.html';
+                return;
+            }
 
             if (!data.password_changed) {
                 window.location.href = 'change-password.html';

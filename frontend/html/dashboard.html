@@ -20,6 +20,7 @@
                     <li><a href="/static/html/select-stop.html">Select Stop</a></li>
                     <li><a href="/static/html/view-allocation.html">My Allocation</a></li>
                     <li><a href="/static/html/bus-pass.html">Bus Pass</a></li>
+                    <li><a href="/static/html/tracking.html">📍 Track My Bus</a></li>
                     <li><a href="#" class="btn-logout" onclick="logout()">Logout</a></li>
                 </ul>
             </div>
@@ -109,11 +110,19 @@
                             <span style="color: var(--text-secondary); font-size: 0.85rem;">Pickup Stop</span>
                             <p id="stopStatus" style="font-weight: 600; margin-top: 4px;">-</p>
                         </div>
-                        <div>
-                            <span style="color: var(--text-secondary); font-size: 0.85rem;">Allocated Bus</span>
-                            <p id="busAlloc" style="font-weight: 600; margin-top: 4px;">-</p>
-                        </div>
                     </div>
+                </div>
+
+                <!-- Track My Bus Card (Always Visible) -->
+                <div id="trackingContainer" class="glass-card slide-up" style="animation-delay: 0.25s;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+                        <div>
+                            <h3 style="margin-bottom: 6px;">🚌 Track My Bus</h3>
+                            <p id="busTrackStatus" class="subtitle" style="font-size: 0.9rem; margin: 0;">Checking bus status...</p>
+                        </div>
+                        <a id="trackBtn" href="/static/html/tracking.html" class="btn btn-primary" style="padding: 12px 24px; font-weight: 700;">📍 Open Live Map</a>
+                    </div>
+                    <div id="trackingStatusBar" style="margin-top: 14px; padding: 10px 14px; border-radius: 10px; font-size: 0.85rem; font-weight: 600;"></div>
                 </div>
             </div>
         </div>
@@ -139,7 +148,22 @@
                     ? '<span class="badge badge-success">Active</span>'
                     : '<span class="badge badge-warning">Not Selected</span>';
                 document.getElementById('stopStatus').textContent = data.stop_id ? `Stop #${data.stop_id}` : 'Not selected';
-                document.getElementById('busAlloc').textContent = data.allocated_bus_id ? `Bus #${data.allocated_bus_id}` : 'Pending';
+
+                // Show tracking card always — update based on allocation
+                if (data.allocated_bus_id) {
+                    checkTripStatus(data.allocated_bus_id);
+                    setInterval(() => checkTripStatus(data.allocated_bus_id), 15000);
+                } else {
+                    // No bus allocated yet
+                    document.getElementById('busTrackStatus').textContent = 'No bus allocated to your account yet';
+                    const bar = document.getElementById('trackingStatusBar');
+                    bar.style.background = 'rgba(148,163,184,0.1)';
+                    bar.style.color = '#94a3b8';
+                    bar.style.border = '1px solid rgba(148,163,184,0.2)';
+                    bar.textContent = 'ℹ️ Admin needs to run bus allocation. Once done, your bus will appear here.';
+                    document.getElementById('trackBtn').style.opacity = '0.4';
+                    document.getElementById('trackBtn').style.pointerEvents = 'none';
+                }
 
                 // Load stop name if available
                 if (data.stop_id) {
@@ -187,6 +211,34 @@
                     });
                 }
             } catch (err) {}
+        }
+
+        async function checkTripStatus(busId) {
+            if (!busId) return;
+            const statusBar = document.getElementById('trackingStatusBar');
+            const statusText = document.getElementById('busTrackStatus');
+            const trackBtn = document.getElementById('trackBtn');
+            try {
+                const res = await fetch(`/tracking/bus/${busId}?token=${token}`);
+                const data = await res.json();
+                if (data.is_active) {
+                    statusText.textContent = `Bus ${data.bus_number || busId} is LIVE — broadcasting location now`;
+                    statusBar.style.background = 'rgba(34,197,94,0.15)';
+                    statusBar.style.color = '#22c55e';
+                    statusBar.style.border = '1px solid rgba(34,197,94,0.3)';
+                    statusBar.textContent = '🟢 LIVE — Tap "Open Live Map" to track in real-time';
+                    trackBtn.style.background = '';
+                    trackBtn.style.opacity = '1';
+                } else {
+                    statusText.textContent = `Bus ${data.bus_number || busId} · Trip not started yet`;
+                    statusBar.style.background = 'rgba(148,163,184,0.1)';
+                    statusBar.style.color = '#94a3b8';
+                    statusBar.style.border = '1px solid rgba(148,163,184,0.2)';
+                    statusBar.textContent = '🅿️ Bus is currently in parking — map will update when trip starts';
+                }
+            } catch (err) {
+                console.error('Trip check failed:', err);
+            }
         }
 
         function logout() {

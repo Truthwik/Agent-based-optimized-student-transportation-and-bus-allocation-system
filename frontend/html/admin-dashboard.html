@@ -21,6 +21,7 @@
                     <li><a href="/static/html/students.html">Students</a></li>
                     <li><a href="/static/html/generate-allocation.html">Allocate</a></li>
                     <li><a href="/static/html/routes.html">Routes</a></li>
+                    <li><a href="/static/html/admin/fleet.html">Live Fleet</a></li>
                     <li><a href="#" class="btn-logout" onclick="logout()">Logout</a></li>
                 </ul>
             </div>
@@ -87,6 +88,11 @@
                         <h3>Account Settings</h3>
                         <p>Change your admin account password</p>
                     </a>
+                    <a href="/static/html/admin/fleet.html" class="nav-card">
+                        <div class="card-icon">🛰️</div>
+                        <h3>Live Fleet Tracking</h3>
+                        <p>Monitor all active buses on a real-time map</p>
+                    </a>
                 </div>
             </div>
         </div>
@@ -104,18 +110,14 @@
                     fetch('/admin/buses', { headers }),
                     fetch('/admin/students', { headers })
                 ]);
-
-                const stops = await stopsRes.json();
-                const buses = await busesRes.json();
+                const stops    = await stopsRes.json();
+                const buses    = await busesRes.json();
                 const students = await studentsRes.json();
-
-                document.getElementById('totalStops').textContent = stops.length;
-                document.getElementById('totalBuses').textContent = buses.length;
+                document.getElementById('totalStops').textContent    = stops.length;
+                document.getElementById('totalBuses').textContent    = buses.length;
                 document.getElementById('totalStudents').textContent = students.length;
-                document.getElementById('busStudents').textContent = students.filter(s => s.bus_required).length;
-            } catch (err) {
-                console.error(err);
-            }
+                document.getElementById('busStudents').textContent   = students.filter(s => s.bus_required).length;
+            } catch (err) { console.error(err); }
         }
 
         function logout() { localStorage.clear(); window.location.href = '/static/html/admin-login.html'; }

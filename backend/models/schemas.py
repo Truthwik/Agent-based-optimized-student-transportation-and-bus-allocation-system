@@ -11,6 +11,7 @@ class LoginResponse(BaseModel):
     token: str
     role: str
     password_changed: Optional[bool] = None
+    bus_id: Optional[int] = None
 
 class ChangePasswordRequest(BaseModel):
     old_password: str
@@ -125,6 +126,8 @@ class AllocationResponse(BaseModel):
     year: int
     phone: Optional[str] = None
     stop_name: str
+    stop_latitude: Optional[float] = None
+    stop_longitude: Optional[float] = None
     bus_number: str
     driver_name: Optional[str] = None
     driver_phone: Optional[str] = None

@@ -5,6 +5,27 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My Allocation | BVRIT Smart Bus</title>
     <link rel="stylesheet" href="/static/css/style.css?v=logo-theme-1">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        #allocationMap {
+            height: 300px;
+            width: 100%;
+            border-radius: 12px;
+            margin-top: 24px;
+            z-index: 0;
+            border: 1px solid var(--glass-border);
+        }
+        .map-label {
+            background: white;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            padding: 2px 6px;
+            font-size: 12px;
+            font-weight: bold;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+    </style>
 </head>
 <body>
     <div class="page-wrapper">
@@ -19,6 +40,7 @@
                     <li><a href="/static/html/select-stop.html">Select Stop</a></li>
                     <li><a href="/static/html/view-allocation.html" class="active">My Allocation</a></li>
                     <li><a href="/static/html/bus-pass.html">Bus Pass</a></li>
+                    <li><a href="/static/html/tracking.html">📍 Track My Bus</a></li>
                     <li><a href="#" class="btn-logout" onclick="logout()">Logout</a></li>
                 </ul>
             </div>
@@ -102,14 +124,103 @@
                                 <p style="font-weight: 600; margin-top: 4px;">${data.driver_phone || 'N/A'}</p>
                             </div>
                         </div>
+                        
+                        <div id="allocationMap" style="background: #f1f5f9; z-index: 10; position: relative;"></div>
+                        <div style="margin-top: 12px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                            <div style="display: flex; gap: 15px; font-size: 0.85rem; color: var(--text-secondary);">
+                                <div style="display: flex; align-items: center; gap: 6px;">
+                                    <div style="width: 12px; height: 12px; background: #3b82f6; border-radius: 50%;"></div> Pickup
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 6px;">
+                                    <div style="width: 12px; height: 12px; background: #ef4444; border-radius: 2px;"></div> College
+                                </div>
+                            </div>
+                            <div id="map-fallback-link"></div>
+                        </div>
                     </div>
                 `;
+                
+                // Initialize map after content is injected
+                console.info("Allocation Data received:", data); // Helpful for local debugging
+                
+                if (data && data.stop_latitude && data.stop_longitude) {
+                    // Coordinates found, initialize map
+                    initAllocationMap(data.stop_latitude, data.stop_longitude, data.stop_name);
+                    
+                    // Add Google Maps fallback link
+                    const fallbackDiv = document.getElementById('map-fallback-link');
+                    if (fallbackDiv) {
+                        const gMapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${data.stop_latitude},${data.stop_longitude}&destination=17.5218,78.5542&travelmode=driving`;
+                        fallbackDiv.innerHTML = `<a href="${gMapsUrl}" target="_blank" style="font-size: 0.8rem; color: var(--accent-blue); text-decoration: none; font-weight: 500; padding: 4px 8px; background: rgba(59,130,246,0.1); border-radius: 4px;">↗ Open in Google Maps</a>`;
+                    }
+                } else {
+                    // COORDINATES MISSING - Show error inside map div
+                    document.getElementById('allocationMap').innerHTML = `
+                        <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; color:var(--text-secondary); text-align:center; padding:20px;">
+                            <span style="font-size: 2rem;">🗺️</span>
+                            <p style="margin-top:10px;">Coordinates for <b>${data.stop_name || 'your stop'}</b> are missing.<br>Please contact Admin to update stop coordinates.</p>
+                        </div>
+                    `;
+                    document.getElementById('map-fallback-link').innerHTML = '<span style="font-size:0.75rem; color:#ef4444;">⚠ Coordinates missing</span>';
+                }
             } catch (err) {
-                content.innerHTML = `<div class="alert alert-error show">Failed to load allocation</div>`;
+                console.error(err);
+                content.innerHTML = `<div class="alert alert-error show">Failed to load allocation data</div>`;
             }
         }
 
         function logout() { localStorage.clear(); window.location.href = '/static/html/login.html'; }
+
+        function initAllocationMap(stopLat, stopLng, stopName) {
+            const collegeCoords = [17.5218, 78.5542];
+            const stopCoords = [stopLat, stopLng];
+            
+            // Re-initialize map safely
+            const map = L.map('allocationMap', { 
+                zoomControl: true,
+                attributionControl: false
+            }).setView(stopCoords, 13);
+
+            // OpenStreetMap tiles (Hardcoded for maximum reliability)
+            L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19
+            }).addTo(map);
+
+            // BVRIT College Marker
+            const collegeIcon = L.divIcon({
+                html: `<div style="font-size: 32px; transform: translate(-10px, -20px);">🏫</div>`,
+                className: 'marker-college',
+                iconSize: [20, 20]
+            });
+
+            // Student Pickup Marker
+            const stopIcon = L.divIcon({
+                html: `<div style="background:#3b82f6; width:20px; height:20px; border-radius:50%; border:3px solid white; box-shadow:0 0 10px rgba(59,130,246,0.6);"></div>`,
+                className: 'marker-stop',
+                iconSize: [20, 20]
+            });
+
+            L.marker(stopCoords, { icon: stopIcon }).addTo(map)
+                .bindPopup(`<b>📍 Your Pickup:</b> ${stopName}`).openPopup();
+
+            L.marker(collegeCoords, { icon: collegeIcon }).addTo(map)
+                .bindPopup(`<b>🏢 BVRIT College</b>`);
+
+            // Auto-align view
+            const bounds = L.latLngBounds([stopCoords, collegeCoords]);
+            map.fitBounds(bounds, { padding: [60, 60] });
+            
+            // Multiple resize triggers for dynamic glass-card rendering
+            const fixMap = () => { map.invalidateSize(); };
+            setTimeout(fixMap, 200);
+            setTimeout(fixMap, 800);
+            setTimeout(fixMap, 2000);
+            window.addEventListener('resize', fixMap);
+        }
+
+
+
+
         loadAllocation();
     </script>
 </body>

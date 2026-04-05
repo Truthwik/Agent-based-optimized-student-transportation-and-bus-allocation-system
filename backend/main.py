@@ -8,7 +8,7 @@ from pathlib import Path
 from sqlalchemy.exc import OperationalError
 
 from .database import engine, Base
-from .routers import auth, admin, student
+from .routers import auth, admin, student, driver, tracking
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +45,8 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(admin.router)
 app.include_router(student.router)
+app.include_router(driver.router)
+app.include_router(tracking.router)
 
 # Serve frontend static files
 frontend_path = Path(__file__).resolve().parent.parent / "frontend"

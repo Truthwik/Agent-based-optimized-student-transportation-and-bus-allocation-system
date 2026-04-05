@@ -4,7 +4,7 @@ import jwt
 from datetime import datetime, timedelta
 
 from ..database import get_db
-from ..models.models import Admin, Student
+from ..models.models import Admin, Student, Bus
 from ..models.schemas import LoginRequest, LoginResponse, ChangePasswordRequest
 from ..config import JWT_SECRET, JWT_ALGORITHM
 
@@ -48,7 +48,25 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
             password_changed=(student.password != student.student_id)
         )
 
+    # Try driver login
+    bus = db.query(Bus).filter(Bus.bus_number == req.username).first()
+    if bus and bus.driver_phone == req.password:
+        token = create_token({"sub": bus.bus_number, "role": "driver", "bus_id": bus.bus_id})
+        return LoginResponse(
+            token=token,
+            role="driver",
+            bus_id=bus.bus_id,
+            password_changed=True
+        )
+
     raise HTTPException(status_code=401, detail="Invalid ID or Password")
+
+
+@router.get("/debug/buses")
+def debug_buses(db: Session = Depends(get_db)):
+    """Temporary debug endpoint — shows bus_number and driver_phone for testing."""
+    buses = db.query(Bus).all()
+    return [{"bus_id": b.bus_id, "bus_number": b.bus_number, "driver_phone": b.driver_phone} for b in buses]
 
 
 @router.post("/change-password")
@@ -72,6 +90,15 @@ def change_password(
         user = db.query(Student).filter(Student.student_id == user_id).first()
         if not user:
             raise HTTPException(status_code=404, detail="[Auth] Student account not found")
+    elif role == "driver":
+        user = db.query(Bus).filter(Bus.bus_number == user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="[Auth] Driver/bus not found")
+        if user.driver_phone != req.old_password:
+            raise HTTPException(status_code=400, detail="[Auth] Current password is incorrect")
+        user.driver_phone = req.new_password
+        db.commit()
+        return {"message": "Password changed successfully"}
     else:
         raise HTTPException(status_code=401, detail="[Auth] Invalid role")
 

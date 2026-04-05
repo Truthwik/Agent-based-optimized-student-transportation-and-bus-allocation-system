@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Track My Bus | BVRIT Smart Bus</title>
+    <link rel="stylesheet" href="/static/css/style.css?v=1.3">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        #map {
+            height: 60vh;
+            min-height: 350px;
+            width: 100%;
+            border-radius: 16px;
+            overflow: hidden;
+            margin-bottom: 20px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        /* Force Leaflet tiles to fill correctly */
+        .leaflet-tile-pane img {
+            width: 256px !important;
+            height: 256px !important;
+        }
+        .parked-card {
+            background: rgba(148,163,184,0.08);
+            border: 2px dashed rgba(148,163,184,0.3);
+            border-radius: 16px;
+            padding: 40px 20px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .live-status-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 14px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            width: fit-content;
+            margin-bottom: 12px;
+        }
+        .live-dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; animation: livepulse 1.5s infinite; }
+        @keyframes livepulse { 0%,100%{opacity:1}50%{opacity:0.4} }
+    </style>
+</head>
+<body>
+    <div class="page-wrapper">
+        <nav class="navbar">
+            <div class="container">
+                <div class="navbar-brand">
+                    <img class="logo-img" src="/static/img/logo.png" alt="BVRIT" width="36" height="36" style="border-radius:8px;vertical-align:middle;margin-right:8px;">
+                    BVRIT Smart Bus
+                </div>
+                <ul class="navbar-links">
+                    <li><a href="/static/html/dashboard.html">← Back to Dashboard</a></li>
+                </ul>
+            </div>
+        </nav>
+
+        <div class="dashboard-content">
+            <div class="container">
+                <div class="page-header slide-up">
+                    <h1>📍 Track My Bus <span id="busNumHeader"></span></h1>
+                    <p class="subtitle" id="trackSubtitle">Loading bus status...</p>
+                </div>
+
+                <!-- Map -->
+                <div id="mapWrapper" class="slide-up" style="display:none;">
+                    <div class="live-status-bar" style="background:rgba(34,197,94,0.15);color:#22c55e;">
+                        <div class="live-dot"></div> LIVE TRACKING
+                    </div>
+                    <div id="map"></div>
+                </div>
+
+                <!-- Parked State -->
+                <div id="parkedCard" class="parked-card slide-up" style="display:none;">
+                    <div style="font-size:3rem;margin-bottom:16px;">🅿️</div>
+                    <h2 style="margin-bottom:8px;">Bus is in Parking</h2>
+                    <p class="subtitle">Your bus has not started the trip yet.<br>This page will automatically update when the driver starts.</p>
+                    <div style="margin-top:20px;padding:12px 20px;background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.2);border-radius:12px;font-size:0.85rem;color:#93c5fd;">
+                        🔄 Auto-refreshing every 15 seconds...
+                    </div>
+                </div>
+
+                <!-- Info Cards (shown when live) -->
+                <div id="infoCards" class="slide-up" style="display:none;">
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;">
+                        <div class="glass-card" style="text-align:center;">
+                            <div style="color:var(--text-secondary);font-size:0.72rem;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">🚀 Speed</div>
+                            <div id="busSpeed" style="font-size:1.3rem;font-weight:700;">-- km/h</div>
+                        </div>
+                        <div class="glass-card" style="text-align:center;">
+                            <div style="color:var(--text-secondary);font-size:0.72rem;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">⏱ ETA</div>
+                            <div id="etaValue" style="font-size:1.3rem;font-weight:700;color:#10b981;">--</div>
+                        </div>
+                        <div class="glass-card" style="text-align:center;">
+                            <div style="color:var(--text-secondary);font-size:0.72rem;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;">🕐 Last Update</div>
+                            <div id="lastUpdated" style="font-size:0.9rem;font-weight:600;">--</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Geofence Alert -->
+                <div id="geofenceAlert" style="display:none;margin-top:16px;" class="glass-card">
+                    <div style="background:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.4);border-radius:12px;padding:16px;text-align:center;color:#f59e0b;">
+                        <div style="font-size:2rem;margin-bottom:8px;">🚌</div>
+                        <strong>Your bus is nearby! Please be ready at your stop.</strong>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const token = localStorage.getItem('token');
+        if (!token || localStorage.getItem('role') !== 'student') window.location.href = '/static/html/login.html';
+
+        let map, busMarker, stopMarker;
+        let busId = null;
+        let studentStop = null;
+        let alertSent = false;
+        let lastEtaUpdate = 0;
+        let pollInterval = null;
+        let mapInitialized = false;
+
+        const busIcon = L.divIcon({
+            html: '<div style="font-size:28px;filter:drop-shadow(0 2px 6px rgba(0,0,0,0.3))">🚌</div>',
+            className: '', iconSize: [34, 34], iconAnchor: [17, 17]
+        });
+        const stopIcon = L.divIcon({
+            html: '<div style="font-size:24px">📍</div>',
+            className: '', iconSize: [28, 34], iconAnchor: [14, 34]
+        });
+
+        async function init() {
+            try {
+                // Get student profile → bus ID
+                const meRes = await fetch('/students/me', { headers: { 'Authorization': 'Bearer ' + token } });
+                const me = await meRes.json();
+
+                if (!me.allocated_bus_id) {
+                    document.getElementById('trackSubtitle').textContent = 'No bus allocated to your account yet.';
+                    document.getElementById('parkedCard').style.display = 'block';
+                    document.getElementById('parkedCard').querySelector('h2').textContent = 'No Bus Allocated';
+                    return;
+                }
+
+                busId = me.allocated_bus_id;
+                document.getElementById('busNumHeader').textContent = `#${busId}`;
+
+                // Get route for drawing polyline + finding student stop
+                try {
+                    const routeRes = await fetch('/students/route', { headers: { 'Authorization': 'Bearer ' + token } });
+                    const routeData = await routeRes.json();
+                    if (routeData && routeData.stops) {
+                        // Find the student's stop
+                        const allocRes = await fetch('/students/allocation', { headers: { 'Authorization': 'Bearer ' + token } });
+                        if (allocRes.ok) {
+                            const alloc = await allocRes.json();
+                            if (alloc && alloc.stop_name) {
+                                studentStop = routeData.stops.find(s => s.stop_name === alloc.stop_name);
+                            }
+                        }
+                    }
+                } catch(_) {}
+
+                // Start polling
+                pollBusStatus();
+                pollInterval = setInterval(pollBusStatus, 8000);
+
+            } catch(err) {
+                console.error('Init error:', err);
+                document.getElementById('trackSubtitle').textContent = 'Failed to load. Please refresh.';
+            }
+        }
+
+        function initMap(lat, lng) {
+            if (mapInitialized) return;
+            mapInitialized = true;
+            document.getElementById('mapWrapper').style.display = 'block';
+            document.getElementById('infoCards').style.display = 'block';
+
+            // Invalidate size after the container becomes visible
+            setTimeout(() => {
+                map = L.map('map', { zoomControl: true }).setView([lat, lng], 14);
+
+                // CartoDB tiles — reliable, no CORS issues
+                L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+                    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
+                    subdomains: 'abcd',
+                    maxZoom: 20
+                }).addTo(map);
+
+                // Campus marker
+                L.marker([17.7231, 78.2618], {
+                    icon: L.divIcon({ html: '<div style="font-size:22px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.3))">🏫</div>', className: '', iconSize: [28, 28], iconAnchor: [14, 14] })
+                }).addTo(map).bindPopup('<b>BVRIT Campus</b>');
+
+                // Student stop marker
+                if (studentStop) {
+                    stopMarker = L.marker([studentStop.latitude, studentStop.longitude], { icon: stopIcon })
+                        .addTo(map).bindPopup(`<b>Your Stop: ${studentStop.stop_name}</b>`).openPopup();
+                }
+
+                // Force redraw
+                map.invalidateSize();
+            }, 100);
+        }
+
+        async function pollBusStatus() {
+            if (!busId) return;
+            try {
+                const res = await fetch(`/tracking/bus/${busId}?token=${token}`);
+                const data = await res.json();
+
+                if (data.is_active && data.latitude) {
+                    // LIVE
+                    document.getElementById('parkedCard').style.display = 'none';
+                    document.getElementById('trackSubtitle').textContent = `Bus ${data.bus_number || busId} is actively broadcasting`;
+
+                    initMap(data.latitude, data.longitude);
+
+                    // Wait for map to initialize before adding marker
+                    setTimeout(() => {
+                        if (!map) return;
+                        const pos = [data.latitude, data.longitude];
+                        if (!busMarker) {
+                            busMarker = L.marker(pos, { icon: busIcon }).addTo(map)
+                                .bindPopup(`<b>Bus ${data.bus_number || busId}</b><br>Speed: ${data.speed_kmh} km/h`);
+                        } else {
+                            busMarker.setLatLng(pos);
+                            busMarker.setPopupContent(`<b>Bus ${data.bus_number || busId}</b><br>Speed: ${data.speed_kmh} km/h`);
+                        }
+                        map.panTo(pos);
+                        map.invalidateSize();
+                    }, 200);
+
+                    document.getElementById('busSpeed').textContent = (data.speed_kmh || 0) + ' km/h';
+                    document.getElementById('lastUpdated').textContent = data.updated_at || 'Just now';
+
+                    // Geofence check (0.5km)
+                    if (studentStop) {
+                        const dist = haversine(data.latitude, data.longitude, studentStop.latitude, studentStop.longitude);
+                        if (dist < 0.5 && !alertSent) {
+                            document.getElementById('geofenceAlert').style.display = 'block';
+                            alertSent = true;
+                        }
+                        // ETA every 30s
+                        if (Date.now() - lastEtaUpdate > 30000) {
+                            fetchETA(data.latitude, data.longitude, studentStop.latitude, studentStop.longitude);
+                        }
+                    }
+                } else {
+                    // PARKED
+                    document.getElementById('parkedCard').style.display = 'block';
+                    document.getElementById('trackSubtitle').textContent = 'Bus has not started the trip yet';
+                    document.getElementById('infoCards').style.display = 'none';
+                    if (busMarker && map) { busMarker.remove(); busMarker = null; }
+                }
+            } catch(err) {
+                console.error('Poll error:', err);
+            }
+        }
+
+        async function fetchETA(busLat, busLng, stopLat, stopLng) {
+            try {
+                const url = `https://router.project-osrm.org/route/v1/driving/${busLng},${busLat};${stopLng},${stopLat}?overview=false`;
+                const res = await fetch(url);
+                const data = await res.json();
+                if (data.routes && data.routes[0]) {
+                    const mins = Math.ceil(data.routes[0].duration / 60);
+                    document.getElementById('etaValue').textContent = `~${mins} min`;
+                    lastEtaUpdate = Date.now();
+                }
+            } catch(_) { document.getElementById('etaValue').textContent = '--'; }
+        }
+
+        function haversine(lat1, lon1, lat2, lon2) {
+            const R = 6371;
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        }
+
+        init();
+    </script>
+</body>
+</html>

@@ -9,6 +9,7 @@ from ..models.models import Student, Stop, Bus, Allocation, Route, RouteStop, Da
 from ..models.schemas import (
     StudentSelectStop, StudentResponse, AllocationResponse, BusPassResponse,
     PassTypeChoice, DayPassAvailableBus, DayPassOrderResponse, DayPassConfirmRequest, DayPassResponse,
+    RouteResponse, RouteStopResponse
 )
 from ..config import RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, DAY_PASS_FARE
 from .auth import decode_token
@@ -93,6 +94,8 @@ def get_allocation(db: Session = Depends(get_db), student: Student = Depends(ver
             year=student.year,
             phone=student.phone,
             stop_name=stop.stop_name if stop else "N/A",
+            stop_latitude=stop.latitude if stop else None,
+            stop_longitude=stop.longitude if stop else None,
             bus_number=bus.bus_number if bus else "N/A",
             driver_name=bus.driver_name if bus else None,
             driver_phone=bus.driver_phone if bus else None,
@@ -117,6 +120,8 @@ def get_allocation(db: Session = Depends(get_db), student: Student = Depends(ver
             year=student.year,
             phone=student.phone,
             stop_name=stop.stop_name if stop else "N/A",
+            stop_latitude=stop.latitude if stop else None,
+            stop_longitude=stop.longitude if stop else None,
             bus_number=bus.bus_number if bus else "N/A",
             driver_name=bus.driver_name if bus else None,
             driver_phone=bus.driver_phone if bus else None,
@@ -173,6 +178,49 @@ def get_bus_pass(db: Session = Depends(get_db), student: Student = Depends(verif
         )
 
     return None
+
+
+@router.get("/route", response_model=Optional[RouteResponse])
+def get_my_route(db: Session = Depends(get_db), student: Student = Depends(verify_student)):
+    # Find active bus allocation
+    bus_id = student.allocated_bus_id
+    if not bus_id:
+        # Check Day Pass
+        today = datetime.now().strftime("%Y-%m-%d")
+        day_pass = db.query(DayPassBooking).filter(
+            DayPassBooking.student_id == student.student_id,
+            DayPassBooking.booking_date == today,
+            DayPassBooking.status == "confirmed"
+        ).first()
+        if day_pass:
+            bus_id = day_pass.bus_id
+    
+    if not bus_id:
+        return None
+
+    route = db.query(Route).filter(Route.bus_id == bus_id).first()
+    if not route:
+        return None
+
+    stops = []
+    for rs in route.route_stops:
+        stops.append(RouteStopResponse(
+            stop_order=rs.stop_order,
+            stop_id=rs.stop.stop_id,
+            stop_name=rs.stop.stop_name,
+            latitude=rs.stop.latitude,
+            longitude=rs.stop.longitude
+        ))
+    
+    return RouteResponse(
+        route_id=route.route_id,
+        bus_id=route.bus_id,
+        bus_number=route.bus.bus_number,
+        total_students=route.total_students,
+        total_stops=route.total_stops,
+        total_distance=getattr(route, 'total_distance', 0.0),
+        stops=stops
+    )
 
 
 @router.post("/choose-pass-type")

@@ -5,6 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Manage Stops | BVRIT Smart Bus</title>
     <link rel="stylesheet" href="/static/css/style.css?v=logo-theme-1">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        #stopsMap { height: 440px; width: 100%; border-radius: 0 0 16px 16px; z-index: 0; }
+        .map-legend { display:flex; gap:20px; flex-wrap:wrap; padding:12px 20px 16px; font-size:0.82rem; color:var(--text-secondary); }
+        .legend-item { display:flex; align-items:center; gap:6px; }
+        .legend-dot { width:11px; height:11px; border-radius:50%; flex-shrink:0; }
+    </style>
 </head>
 <body>
     <div class="page-wrapper">
@@ -40,7 +48,21 @@
                     <button class="btn btn-primary" onclick="showAddModal()">+ Add Stop</button>
                 </div>
 
-                <div class="glass-card slide-up" style="padding: 0;">
+                <!-- Stops Map -->
+                <div class="glass-card slide-up" style="padding: 0; margin-top: 10px; overflow: hidden;">
+                    <div style="padding: 16px 20px 12px; border-bottom: 1px solid var(--glass-border);">
+                        <h3 style="margin:0 0 3px;">📍 Stop Network Map</h3>
+                        <p class="subtitle" style="margin:0; font-size:0.82rem;">All registered stops and BVRIT campus — click any marker for details</p>
+                    </div>
+                    <div id="stopsMap"></div>
+                    <div class="map-legend">
+                        <div class="legend-item"><div class="legend-dot" style="background:#3b82f6;"></div> Bus Stop</div>
+                        <div class="legend-item"><div class="legend-dot" style="background:#ef4444;"></div> BVRIT Campus</div>
+                        <div class="legend-item" id="mapStopCount"><span>Loading...</span></div>
+                    </div>
+                </div>
+
+                <div class="glass-card slide-up" style="padding: 0; margin-top: 20px;">
                     <div class="table-wrapper">
                         <table>
                             <thead>
@@ -58,6 +80,7 @@
                         </table>
                     </div>
                 </div>
+
             </div>
         </div>
     </div>
@@ -116,6 +139,10 @@
                         </td>
                     </tr>
                 `).join('');
+
+                // Refresh map markers
+                if (typeof refreshMap === 'function') refreshMap(stops);
+
             } catch (err) { console.error(err); }
         }
 
@@ -196,6 +223,55 @@
         }
 
         function logout() { localStorage.clear(); window.location.href = '/static/html/admin-login.html'; }
+
+        // ── Map ──────────────────────────────────────────────────
+        const BVRIT_COORDS = [17.5218, 78.5542];
+        let stopsMap, stopMarkers = [];
+
+        function initStopsMap() {
+            stopsMap = L.map('stopsMap', { zoomControl: true }).setView(BVRIT_COORDS, 11);
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; OpenStreetMap &copy; CARTO',
+                subdomains: 'abcd', maxZoom: 20
+            }).addTo(stopsMap);
+
+            // BVRIT Campus
+            L.marker(BVRIT_COORDS, {
+                icon: L.divIcon({
+                    html: `<div style="background:#ef4444;width:18px;height:18px;border-radius:50%;border:3px solid white;box-shadow:0 2px 8px rgba(239,68,68,0.5);"></div>`,
+                    className: '', iconSize: [18,18], iconAnchor: [9,9]
+                })
+            }).addTo(stopsMap).bindPopup('<b style="color:#ef4444;">🏫 BVRIT Campus</b><br>Narsapur, Medak');
+
+            setTimeout(() => stopsMap.invalidateSize(), 200);
+        }
+
+        function refreshMap(stops) {
+            // Remove old stop markers
+            stopMarkers.forEach(m => m.remove());
+            stopMarkers = [];
+
+            const stopIcon = L.divIcon({
+                html: `<div style="background:#3b82f6;width:13px;height:13px;border-radius:50%;border:2px solid white;box-shadow:0 2px 6px rgba(59,130,246,0.5);"></div>`,
+                className: '', iconSize: [13,13], iconAnchor: [6,6]
+            });
+
+            const bounds = [BVRIT_COORDS];
+            stops.forEach(s => {
+                if (!s.latitude || !s.longitude) return;
+                const lat = parseFloat(s.latitude), lng = parseFloat(s.longitude);
+                bounds.push([lat, lng]);
+                const m = L.marker([lat, lng], { icon: stopIcon })
+                    .addTo(stopsMap)
+                    .bindPopup(`<b>📍 ${s.stop_name}</b><br><small style="color:#64748b;">Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)}</small>`);
+                stopMarkers.push(m);
+            });
+
+            document.getElementById('mapStopCount').innerHTML = `<span>📊 ${stops.length} stops</span>`;
+            if (bounds.length > 1) stopsMap.fitBounds(bounds, { padding: [30, 30] });
+        }
+
+        initStopsMap();
         loadStops();
     </script>
 </body>

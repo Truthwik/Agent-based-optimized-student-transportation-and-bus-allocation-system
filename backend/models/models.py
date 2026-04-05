@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, Boolean, ForeignKey
+from sqlalchemy import Column, Integer, String, Float, Boolean, ForeignKey, DateTime, func
 from sqlalchemy.orm import relationship
 from backend.database import Base
 
@@ -117,3 +117,15 @@ class BusDailyCapacity(Base):
     bus_id = Column(Integer, ForeignKey("buses.bus_id"), nullable=False)
     travel_date = Column(String(10), nullable=False)  # YYYY-MM-DD
     booked_seats = Column(Integer, default=0)
+
+
+class BusLocationHistory(Base):
+    __tablename__ = "bus_location_history"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    bus_id = Column(Integer, ForeignKey("buses.bus_id"), nullable=False)
+    latitude = Column(Float, nullable=False)
+    longitude = Column(Float, nullable=False)
+    speed_kmh = Column(Float, default=0)
+    accuracy_meters = Column(Float, default=0)
+    recorded_at = Column(DateTime, server_default=func.now())
