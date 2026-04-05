@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Announcements | BVRIT Admin</title>
+    <link rel="stylesheet" href="/static/css/style.css?v=1.3">
+    <style>
+        .ann-card {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px;
+            margin-bottom: 12px;
+        }
+        .ann-info { flex: 1; }
+        .ann-type {
+            font-size: 0.7rem;
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin-bottom: 4px;
+            display: inline-block;
+        }
+    </style>
+</head>
+<body>
+    <div class="page-wrapper">
+        <nav class="navbar">
+            <div class="container">
+                <div class="navbar-brand">
+                    <img class="logo-img" src="/static/img/logo.png" alt="Vishnu Logo" width="36" height="36" style="border-radius: 8px;">
+                    BVRIT Admin
+                </div>
+                <ul class="navbar-links">
+                    <li><a href="/static/html/admin-dashboard.html">Dashboard</a></li>
+                    <li><a href="/static/html/admin-announcements.html" class="active">Announcements</a></li>
+                    <li><a href="/static/html/students.html">Students</a></li>
+                    <li><a href="/static/html/admin-requests.html">Requests</a></li>
+                    <li><a href="/static/html/manage-coordinators.html">Coordinators</a></li>
+                    <li><a href="/static/html/routes.html">Routes</a></li>
+                    <li><a href="#" class="btn-logout" onclick="logout()">Logout</a></li>
+                </ul>
+            </div>
+        </nav>
+
+        <div class="dashboard-content">
+            <div class="container">
+                <div class="page-header slide-up">
+                    <h1>📢 Manage Announcements</h1>
+                    <p class="subtitle">Post global alerts to all students or remove expired ones</p>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1.5fr; gap: 24px;">
+                    <!-- Post Form -->
+                    <div class="glass-card slide-up" style="height: fit-content;">
+                        <h2 style="margin-bottom: 24px;">New Global Alert</h2>
+                        <div id="alert" class="alert"></div>
+                        <form id="annForm">
+                            <div class="form-group">
+                                <label>Title</label>
+                                <input type="text" id="title" class="form-control" placeholder="e.g. Holiday Notice" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Message</label>
+                                <textarea id="message" class="form-control" rows="4" placeholder="Detailed message..." required></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label>Expires At</label>
+                                <input type="datetime-local" id="expiresAt" class="form-control" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-block">Broadcast Announcement 🚀</button>
+                        </form>
+                    </div>
+
+                    <!-- List Container -->
+                    <div id="listContainer" class="slide-up" style="animation-delay: 0.1s;">
+                        <h2 style="margin-bottom: 24px;">Current Active Alerts</h2>
+                        <div id="annList">
+                            <div style="text-align: center; padding: 40px; color: var(--text-secondary);">Loading...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const token = localStorage.getItem('token');
+        if (!token || localStorage.getItem('role') !== 'admin') window.location.href = '/static/html/login.html';
+
+        // Set default expiry to tomorrow midnight
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        tomorrow.setHours(23, 59, 0, 0);
+        document.getElementById('expiresAt').value = new Date(tomorrow.getTime() - (tomorrow.getTimezoneOffset() * 60000)).toISOString().slice(0,16);
+
+        async function loadAnnouncements() {
+            try {
+                const res = await fetch('/admin/announcements', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const anns = await res.json();
+                
+                const list = document.getElementById('annList');
+                if (anns.length === 0) {
+                    list.innerHTML = '<div class="glass-card" style="text-align:center; padding:32px; color:var(--text-secondary)">No active announcements.</div>';
+                    return;
+                }
+
+                list.innerHTML = anns.map(a => `
+                    <div class="glass-card ann-card">
+                        <div class="ann-info">
+                            <span class="ann-type" style="background:${a.bus_id ? 'rgba(59,130,246,0.1); color:var(--accent-blue)' : 'rgba(239,68,68,0.1); color:#ef4444'}">
+                                ${a.bus_id ? 'Bus #' + a.bus_id : 'GLOBAL'}
+                            </span>
+                            <h3 style="margin:0">${a.title}</h3>
+                            <p style="font-size:0.85rem; color:var(--text-secondary); margin:4px 0">${a.message.substring(0, 80)}${a.message.length > 80 ? '...' : ''}</p>
+                            <div style="font-size:0.75rem; color:var(--text-secondary)">Expires: ${new Date(a.expires_at).toLocaleString()}</div>
+                        </div>
+                        <button class="btn btn-secondary btn-sm" style="color:#ef4444; border-color:#ef4444" onclick="deleteAnn(${a.id})">Delete</button>
+                    </div>
+                `).join('');
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        document.getElementById('annForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const alertBox = document.getElementById('alert');
+            const data = {
+                title: document.getElementById('title').value,
+                message: document.getElementById('message').value,
+                expires_at: document.getElementById('expiresAt').value
+            };
+
+            try {
+                const res = await fetch('/admin/announcements', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                if (res.ok) {
+                    alertBox.className = 'alert alert-success show';
+                    alertBox.textContent = '🚀 Global announcement broadcasted successfully!';
+                    document.getElementById('annForm').reset();
+                    loadAnnouncements();
+                } else {
+                    const data = await res.json();
+                    throw new Error(data.detail || 'Post failed');
+                }
+            } catch (err) {
+                alertBox.className = 'alert alert-error show';
+                alertBox.textContent = 'Failed: ' + err.message;
+            }
+        });
+
+        async function deleteAnn(id) {
+            if (!confirm('Are you sure you want to delete this announcement?')) return;
+            try {
+                const res = await fetch(`/admin/announcements/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) loadAnnouncements();
+            } catch (err) { alert('Delete failed'); }
+        }
+
+        function logout() { localStorage.clear(); window.location.href = '/static/html/login.html'; }
+        loadAnnouncements();
+    </script>
+</body>
+</html>

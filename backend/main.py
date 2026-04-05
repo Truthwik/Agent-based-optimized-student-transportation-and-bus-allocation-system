@@ -8,7 +8,7 @@ from pathlib import Path
 from sqlalchemy.exc import OperationalError
 
 from .database import engine, Base
-from .routers import auth, admin, student, driver, tracking
+from .routers import auth, admin, student, driver, tracking, coordinator
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +45,7 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(admin.router)
 app.include_router(student.router)
+app.include_router(coordinator.router)
 app.include_router(driver.router)
 app.include_router(tracking.router)
 

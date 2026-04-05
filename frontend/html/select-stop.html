@@ -72,6 +72,7 @@
                 </div>
                 <ul class="navbar-links">
                     <li><a href="/static/html/dashboard.html">Dashboard</a></li>
+                    <li><a href="/static/html/student-announcements.html">Announcements</a></li>
                     <li><a href="/static/html/select-stop.html" class="active">Select Stop</a></li>
                     <li><a href="/static/html/view-allocation.html">My Allocation</a></li>
                     <li><a href="/static/html/bus-pass.html">Bus Pass</a></li>
@@ -240,7 +241,7 @@
                 if (userData.allocated_bus_id) {
                     document.getElementById('selectionCard').style.display = 'none';
                     document.getElementById('allocatedCard').style.display = 'block';
-                    document.getElementById('assignedBusNum').textContent = `Bus #${userData.allocated_bus_id}`;
+                    document.getElementById('assignedBusNum').textContent = `Bus #${userData.allocated_bus_number || userData.allocated_bus_id}`;
                     loadStops('newStopId');
                     
                     if (userData.stop_id) {
@@ -456,6 +457,44 @@
                 }
             } catch (err) {}
         });
+
+        const requestForm = document.getElementById('requestForm');
+        if (requestForm) {
+            requestForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const newStopId = document.getElementById('newStopId').value;
+                const changeReason = document.getElementById('changeReason').value;
+                
+                if (!newStopId || !changeReason.trim()) {
+                    alert("Please fill out both fields.");
+                    return;
+                }
+
+                try {
+                    const res = await fetch('/students/stop-change-request', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify({
+                            requested_stop_id: parseInt(newStopId),
+                            reason: changeReason
+                        })
+                    });
+
+                    if (res.ok) {
+                        alert('✅ Stop change request submitted successfully! An Admin will review it.');
+                        document.getElementById('changeReason').value = '';
+                    } else {
+                        const data = await res.json();
+                        alert('Failed: ' + (data.detail || 'Could not submit request'));
+                    }
+                } catch (err) {
+                    alert('Connection error');
+                }
+            });
+        }
 
         function logout() { localStorage.clear(); window.location.href = '/static/html/login.html'; }
         loadCurrent();

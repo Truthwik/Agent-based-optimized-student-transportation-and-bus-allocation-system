@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Complaints | Coordinator Portal</title>
+    <link rel="stylesheet" href="/static/css/style.css?v=logo-theme-1">
+    <style>
+        .tabs { display: flex; gap: 16px; margin-bottom: 24px; border-bottom: 1px solid var(--glass-border); padding-bottom: 12px; }
+        .tab { background: none; border: none; color: var(--text-secondary); font-size: 1rem; font-weight: 600; cursor: pointer; padding: 8px 16px; border-radius: 8px; transition: all 0.3s; }
+        .tab.active { background: rgba(255,255,255,0.1); color: var(--text-primary); }
+        .c-card { border-left: 4px solid; padding: 16px 20px; }
+        .c-card.open { border-left-color: #ef4444; }
+        .c-card.resolved { border-left-color: #10b981; opacity: 0.8; }
+    </style>
+</head>
+<body>
+    <div class="page-wrapper">
+        <nav class="navbar">
+            <div class="container">
+                <div class="navbar-brand">
+                    <img class="logo-img" src="/static/img/logo.png" alt="Logo" width="32" height="32">
+                    Coordinator Portal
+                </div>
+                <ul class="navbar-links">
+                    <li><a href="/static/html/coordinator/dashboard.html">Dashboard</a></li>
+                    <li><a href="/static/html/coordinator/students.html">Students</a></li>
+                    <li><a href="/static/html/coordinator/tracking.html">Live Tracking</a></li>
+                    <li><a href="/static/html/coordinator/route.html">Route</a></li>
+                    <li><a href="/static/html/coordinator/daypass.html">Day Pass</a></li>
+                    <li><a href="/static/html/coordinator/profile.html">Profile</a></li>
+                    <li><a href="#" class="btn-logout" onclick="logout()">Logout</a></li>
+                </ul>
+            </div>
+        </nav>
+
+        <div class="dashboard-content">
+            <div class="container">
+                <div class="page-header slide-up">
+                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap;">
+                        <div>
+                            <h1>🔔 Complaints & Issues</h1>
+                            <p class="subtitle" id="statsText">Loading...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tabs slide-up" style="animation-delay: 0.1s;">
+                    <button class="tab active" onclick="setFilter('all', this)">All</button>
+                    <button class="tab" onclick="setFilter('open', this)">Open <span id="openCount" class="badge" style="background:#ef4444;color:white;margin-left:8px;">0</span></button>
+                    <button class="tab" onclick="setFilter('resolved', this)">Resolved</button>
+                </div>
+
+                <div id="complaintsContainer" class="slide-up" style="animation-delay: 0.2s; display: grid; gap: 16px;">
+                    <div style="text-align:center; padding:40px;">Loading...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Resolve Modal -->
+    <div class="modal-overlay" id="resolveModal">
+        <div class="modal">
+            <h2>Resolve Issue</h2>
+            <input type="hidden" id="resolveId">
+            <div class="form-group">
+                <label>Resolution Note</label>
+                <textarea id="resNote" class="form-control" rows="4" placeholder="How was this issue resolved?" required></textarea>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeResolveModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="submitResolution()">Mark as Resolved</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const token = localStorage.getItem('token');
+        if (!token || localStorage.getItem('role') !== 'coordinator') window.location.href = '/static/html/login.html';
+        const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
+        
+        let allComplaints = [];
+        let currentFilter = 'all';
+
+        async function loadComplaints() {
+            try {
+                const res = await fetch('/coordinator/complaints', { headers });
+                if (!res.ok) { if(res.status === 401) logout(); return; }
+                allComplaints = await res.json();
+                
+                const openData = allComplaints.filter(c => c.status === 'open');
+                document.getElementById('openCount').textContent = openData.length;
+                document.getElementById('statsText').textContent = `${openData.length} open issues requiring attention`;
+                
+                renderComplaints();
+            } catch (err) { console.error(err); }
+        }
+
+        function setFilter(filter, btnElement) {
+            currentFilter = filter;
+            document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+            btnElement.classList.add('active');
+            renderComplaints();
+        }
+
+        function renderComplaints() {
+            const container = document.getElementById('complaintsContainer');
+            const data = currentFilter === 'all' ? allComplaints : allComplaints.filter(c => c.status === currentFilter);
+
+            if (data.length === 0) {
+                container.innerHTML = `<div class="glass-card empty-state">No ${currentFilter === 'all' ? '' : currentFilter} complaints found</div>`;
+                return;
+            }
+
+            container.innerHTML = data.map(c => `
+                <div class="glass-card c-card ${c.status}">
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px;">
+                        <div>
+                            <div style="display:flex; align-items:center; gap:12px; margin-bottom:8px">
+                                ${c.status === 'open' 
+                                    ? '<span style="background:rgba(239,68,68,0.1); color:#ef4444; padding:4px 8px; border-radius:4px; font-size:0.75rem; font-weight:700">🔴 OPEN</span>'
+                                    : '<span style="background:rgba(16,185,129,0.1); color:#10b981; padding:4px 8px; border-radius:4px; font-size:0.75rem; font-weight:700">🟢 RESOLVED</span>'
+                                }
+                                <strong style="color:var(--text-secondary); text-transform:uppercase; font-size:0.8rem">${c.category.replace('_', ' ')}</strong>
+                                <span style="color:var(--text-secondary); font-size:0.8rem">${c.created_at}</span>
+                            </div>
+                            <h3 style="margin:0 0 4px 0">${c.student_name} <span style="color:var(--accent-blue); font-size:0.9rem; margin-left:8px">${c.roll_number}</span></h3>
+                            <p style="margin:8px 0 0 0; font-size:1.05rem;">"${c.description}"</p>
+                        </div>
+                        
+                        ${c.status === 'open' 
+                            ? `<button class="btn btn-primary btn-sm" onclick="openResolveModal(${c.id})">Resolve ✓</button>`
+                            : ''
+                        }
+                    </div>
+
+                    ${c.status === 'resolved' ? `
+                        <div style="margin-top: 16px; padding: 12px; background: rgba(16,185,129,0.05); border-radius: 8px; border: 1px dashed rgba(16,185,129,0.3);">
+                            <span style="color:#10b981; font-weight:600; font-size:0.85rem">Resolution Note (${c.resolved_at}):</span>
+                            <p style="margin:4px 0 0 0; font-size:0.95rem">${c.resolution_note}</p>
+                        </div>
+                    ` : ''}
+                </div>
+            `).join('');
+        }
+
+        function openResolveModal(id) {
+            document.getElementById('resolveId').value = id;
+            document.getElementById('resNote').value = '';
+            document.getElementById('resolveModal').classList.add('show');
+        }
+
+        function closeResolveModal() {
+            document.getElementById('resolveModal').classList.remove('show');
+        }
+
+        async function submitResolution() {
+            const id = document.getElementById('resolveId').value;
+            const note = document.getElementById('resNote').value;
+            
+            if (!note.trim()) { alert('Please enter a resolution note'); return; }
+
+            try {
+                const res = await fetch(`/coordinator/complaints/${id}/resolve`, {
+                    method: 'PUT',
+                    headers,
+                    body: JSON.stringify({ resolution_note: note })
+                });
+                if (!res.ok) throw new Error('Failed to resolve');
+                
+                closeResolveModal();
+                loadComplaints();
+            } catch (err) { alert('Error resolving complaint'); }
+        }
+
+        function logout() { localStorage.clear(); window.location.href = '/static/html/login.html'; }
+        loadComplaints();
+    </script>
+</body>
+</html>

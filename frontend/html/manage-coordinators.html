@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Coordinators | BVRIT Smart Bus</title>
+    <link rel="stylesheet" href="/static/css/style.css?v=logo-theme-1">
+</head>
+<body>
+    <div class="page-wrapper">
+        <nav class="navbar">
+            <div class="container">
+                <div class="navbar-brand">
+                    <img class="logo-img" src="/static/img/logo.png" alt="BVRIT logo" width="32" height="32">
+                    BVRIT Admin
+                </div>
+                <ul class="navbar-links">
+                    <li><a href="/static/html/admin-dashboard.html">Dashboard</a></li>
+                    <li><a href="/static/html/students.html">Students</a></li>
+                    <li><a href="/static/html/admin-requests.html">Requests</a></li>
+                    <li><a href="/static/html/manage-coordinators.html" class="active">Coordinators</a></li>
+                    <li><a href="/static/html/routes.html">Routes</a></li>
+                    <li><a href="#" class="btn-logout" onclick="logout()">Logout</a></li>
+                </ul>
+            </div>
+        </nav>
+
+        <div class="dashboard-content">
+            <div class="container">
+                <div class="page-header slide-up">
+                    <h1>👨‍🏫 Manage Coordinators</h1>
+                    <p class="subtitle">Add, edit, or deactivate Faculty Bus Coordinators</p>
+                </div>
+
+                <div id="alert" class="alert"></div>
+
+                <div class="toolbar slide-up">
+                    <div></div>
+                    <button class="btn btn-primary" onclick="showAddModal()">+ Add Coordinator</button>
+                </div>
+
+                <div class="glass-card slide-up" style="padding: 0;">
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Emp ID</th>
+                                    <th>Name</th>
+                                    <th>Email & Phone</th>
+                                    <th>Assigned Bus</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="coordinatorsTable">
+                                <tr><td colspan="6" style="text-align:center;padding:40px;">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal -->
+    <div class="modal-overlay" id="modal">
+        <div class="modal">
+            <h2 id="modalTitle">Add Coordinator</h2>
+            <input type="hidden" id="editId">
+            <div class="form-group">
+                <label>Name</label>
+                <input type="text" id="coordName" class="form-control" placeholder="e.g. Dr. Prasad" required>
+            </div>
+            <div class="form-group">
+                <label>Employee ID</label>
+                <input type="text" id="empId" class="form-control" placeholder="e.g. FAC2021045" required>
+            </div>
+            <div class="form-group">
+                <label>Email</label>
+                <input type="email" id="email" class="form-control" placeholder="e.g. example@bvrit.ac.in" required>
+            </div>
+            <div class="form-group">
+                <label>Phone Number</label>
+                <input type="text" id="phone" class="form-control" placeholder="e.g. 9876543210" required>
+            </div>
+            <div class="form-group">
+                <label>Assign Bus</label>
+                <select id="busSelect" class="form-control" required>
+                    <option value="">Select a Bus</option>
+                </select>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="saveCoordinator()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const token = localStorage.getItem('token');
+        if (!token || localStorage.getItem('role') !== 'admin') window.location.href = '/static/html/admin-login.html';
+        const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
+
+        let allBuses = [];
+
+        async function init() {
+            await loadBuses();
+            await loadCoordinators();
+        }
+
+        async function loadBuses() {
+            try {
+                const res = await fetch('/admin/buses', { headers });
+                allBuses = await res.json();
+                
+                const select = document.getElementById('busSelect');
+                select.innerHTML = '<option value="">Select a Bus</option>';
+                allBuses.forEach(b => {
+                    select.innerHTML += `<option value="${b.bus_id}">${b.bus_number}</option>`;
+                });
+            } catch (err) { console.error("Error loading buses", err); }
+        }
+
+        async function loadCoordinators() {
+            try {
+                const res = await fetch('/admin/coordinators', { headers });
+                const coords = await res.json();
+                const tbody = document.getElementById('coordinatorsTable');
+
+                if (coords.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No coordinators added yet</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = coords.map(c => `
+                    <tr>
+                        <td><strong>${c.employee_id}</strong></td>
+                        <td>${c.name}</td>
+                        <td>${c.email}<br><small style="color:var(--text-secondary)">${c.phone}</small></td>
+                        <td><span style="background:var(--glass-bg); padding:4px 8px; border-radius:4px; font-size:0.85rem">${c.bus_number || 'N/A'}</span></td>
+                        <td>${c.is_active ? '<span style="color:#10b981;font-weight:600">Active</span>' : '<span style="color:#ef4444;font-weight:600">Inactive</span>'}</td>
+                        <td>
+                            <div class="action-btns">
+                                <button class="btn btn-secondary btn-sm" onclick="editCoord(${c.id}, '${c.name}', '${c.employee_id}', '${c.email}', '${c.phone}', ${c.bus_id})">Edit</button>
+                                ${c.is_active 
+                                    ? `<button class="btn btn-danger btn-sm" onclick="deactivateCoord(${c.id})">Deactivate</button>` 
+                                    : `<button class="btn btn-primary btn-sm" onclick="reactivateCoord(${c.id})">Reactivate</button>`}
+                            </div>
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (err) { console.error(err); }
+        }
+
+        function showAddModal() {
+            document.getElementById('modalTitle').textContent = 'Add Coordinator';
+            document.getElementById('editId').value = '';
+            document.getElementById('coordName').value = '';
+            document.getElementById('empId').value = '';
+            document.getElementById('email').value = '';
+            document.getElementById('phone').value = '';
+            document.getElementById('busSelect').value = '';
+            document.getElementById('empId').disabled = false; // allow editing
+            document.getElementById('modal').classList.add('show');
+        }
+
+        function editCoord(id, name, emp_id, email, phone, bus_id) {
+            document.getElementById('modalTitle').textContent = 'Edit Coordinator';
+            document.getElementById('editId').value = id;
+            document.getElementById('coordName').value = name;
+            document.getElementById('empId').value = emp_id;
+            document.getElementById('email').value = email;
+            document.getElementById('phone').value = phone;
+            document.getElementById('busSelect').value = bus_id;
+            document.getElementById('empId').disabled = true; // prevent changing employee id
+            document.getElementById('modal').classList.add('show');
+        }
+
+        function closeModal() { document.getElementById('modal').classList.remove('show'); }
+
+        async function saveCoordinator() {
+            const id = document.getElementById('editId').value;
+            const body = {
+                name: document.getElementById('coordName').value,
+                email: document.getElementById('email').value,
+                phone: document.getElementById('phone').value,
+                bus_id: parseInt(document.getElementById('busSelect').value)
+            };
+            if (!id) {
+                body.employee_id = document.getElementById('empId').value;
+            }
+
+            const alert = document.getElementById('alert');
+
+            try {
+                const url = id ? `/admin/coordinators/${id}` : '/admin/coordinators';
+                const method = id ? 'PUT' : 'POST';
+                const res = await fetch(url, { method, headers, body: JSON.stringify(body) });
+                const data = await res.json();
+
+                if (!res.ok) {
+                    alert.className = 'alert alert-error show';
+                    alert.textContent = data.detail || 'Error saving coordinator';
+                    return;
+                }
+
+                alert.className = 'alert alert-success show';
+                alert.textContent = id ? 'Coordinator updated!' : 'Coordinator added!';
+                closeModal();
+                loadCoordinators();
+            } catch (err) {
+                alert.className = 'alert alert-error show';
+                alert.textContent = 'Connection error';
+            }
+        }
+
+        async function deactivateCoord(id) {
+            if (!confirm('Deactivate this coordinator?')) return;
+            const alert = document.getElementById('alert');
+            try {
+                const res = await fetch(`/admin/coordinators/${id}`, { method: 'DELETE', headers });
+                if (!res.ok) { alert.className = 'alert alert-error show'; return; }
+                alert.className = 'alert alert-success show';
+                alert.textContent = 'Coordinator deactivated!';
+                loadCoordinators();
+            } catch (err) { alert.className = 'alert alert-error show'; alert.textContent = 'Error'; }
+        }
+
+        async function reactivateCoord(id) {
+            if (!confirm('Reactivate this coordinator?')) return;
+            const alert = document.getElementById('alert');
+            try {
+                const res = await fetch(`/admin/coordinators/${id}`, { method: 'PUT', headers, body: JSON.stringify({ is_active: true }) });
+                if (!res.ok) { alert.className = 'alert alert-error show'; return; }
+                alert.className = 'alert alert-success show';
+                alert.textContent = 'Coordinator reactivated!';
+                loadCoordinators();
+            } catch (err) { alert.className = 'alert alert-error show'; alert.textContent = 'Error'; }
+        }
+
+        function logout() { localStorage.clear(); window.location.href = '/static/html/admin-login.html'; }
+        
+        init();
+    </script>
+</body>
+</html>

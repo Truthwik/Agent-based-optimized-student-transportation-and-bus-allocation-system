@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Announcements | Coordinator Portal</title>
+    <link rel="stylesheet" href="/static/css/style.css?v=logo-theme-1">
+</head>
+<body>
+    <div class="page-wrapper">
+        <nav class="navbar">
+            <div class="container">
+                <div class="navbar-brand">
+                    <img class="logo-img" src="/static/img/logo.png" alt="Logo" width="32" height="32">
+                    Coordinator Portal
+                </div>
+                <ul class="navbar-links">
+                    <li><a href="/static/html/coordinator/dashboard.html">Dashboard</a></li>
+                    <li><a href="/static/html/coordinator/students.html">Students</a></li>
+                    <li><a href="/static/html/coordinator/tracking.html">Live Tracking</a></li>
+                    <li><a href="/static/html/coordinator/route.html">Route</a></li>
+                    <li><a href="/static/html/coordinator/daypass.html">Day Pass</a></li>
+                    <li><a href="/static/html/coordinator/profile.html">Profile</a></li>
+                    <li><a href="#" class="btn-logout" onclick="logout()">Logout</a></li>
+                </ul>
+            </div>
+        </nav>
+
+        <div class="dashboard-content">
+            <div class="container">
+                <div class="page-header slide-up">
+                    <h1>📢 Announcements</h1>
+                    <p class="subtitle">Broadcast messages to students on your bus</p>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 24px; align-items: start;">
+                    <div class="glass-card slide-up" style="animation-delay: 0.1s;">
+                        <h3>New Announcement</h3>
+                        <div id="alert" class="alert"></div>
+                        <div class="form-group" style="margin-top:20px;">
+                            <label>Title</label>
+                            <input type="text" id="title" class="form-control" placeholder="e.g. Bus Delay Tomorrow" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Message</label>
+                            <textarea id="message" class="form-control" rows="4" placeholder="Enter announcement text..." required></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Expires At</label>
+                            <input type="datetime-local" id="expiresAt" class="form-control" required>
+                        </div>
+                        <button class="btn btn-primary" style="width:100%" onclick="postAnnouncement()">Post Announcement</button>
+                    </div>
+
+                    <div style="display: grid; gap: 16px;" id="listContainer" class="slide-up" style="animation-delay: 0.2s;">
+                        <div style="text-align:center; padding: 40px; color:var(--text-secondary)">Loading...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const token = localStorage.getItem('token');
+        if (!token || localStorage.getItem('role') !== 'coordinator') window.location.href = '/static/html/login.html';
+        const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
+
+        // Set default expiry to tomorrow
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        tomorrow.setHours(23, 59, 0, 0);
+        // Format for datetime-local
+        document.getElementById('expiresAt').value = new Date(tomorrow.getTime() - (tomorrow.getTimezoneOffset() * 60000)).toISOString().slice(0,16);
+
+        async function loadAnnouncements() {
+            try {
+                const res = await fetch('/coordinator/announcements', { headers });
+                if (!res.ok) { if(res.status === 401) logout(); return; }
+                const anns = await res.json();
+                
+                const container = document.getElementById('listContainer');
+                if (anns.length === 0) {
+                    container.innerHTML = '<div class="glass-card empty-state">No announcements posted yet</div>';
+                    return;
+                }
+
+                const now = new Date();
+
+                container.innerHTML = anns.map(a => {
+                    const exp = new Date(a.expires_at);
+                    const isPassed = now > exp || !a.is_active;
+                    
+                    return `
+                    <div class="glass-card" style="border-left: 4px solid ${isPassed ? 'transparent' : 'var(--accent-blue)'}; opacity: ${isPassed ? '0.7' : '1'}; position: relative;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                            <h3 style="margin:0; ${isPassed ? 'color:var(--text-secondary)' : 'color:var(--text-primary)'}">${a.title}</h3>
+                            <span style="font-size:0.75rem; padding:4px 8px; border-radius:4px; font-weight:600; background: ${isPassed ? 'rgba(255,255,255,0.1)' : 'rgba(59,130,246,0.1)'}; color: ${isPassed ? 'var(--text-secondary)' : 'var(--accent-blue)'}">
+                                ${isPassed ? 'EXPIRED' : 'ACTIVE'}
+                            </span>
+                        </div>
+                        <p style="margin:0 0 16px 0; color:var(--text-secondary)">${a.message}</p>
+                        <div style="display:flex; justify-content:space-between; align-items:flex-end; font-size:0.8rem; color:var(--text-secondary)">
+                            <div>
+                                <div>Posted: ${new Date(a.created_at).toLocaleString()}</div>
+                                <div style="margin-top:2px">Expires: ${exp.toLocaleString()}</div>
+                            </div>
+                            ${!isPassed && a.is_active ? `<button class="btn btn-secondary btn-sm" style="color:#ef4444; border-color:#ef4444" onclick="deleteAnnouncement(${a.id})">Delete</button>` : ''}
+                        </div>
+                    </div>`;
+                }).join('');
+            } catch (err) { console.error(err); }
+        }
+
+        async function postAnnouncement() {
+            const title = document.getElementById('title').value;
+            const message = document.getElementById('message').value;
+            const expiresAt = document.getElementById('expiresAt').value;
+            const alertBox = document.getElementById('alert');
+
+            if (!title || !message || !expiresAt) {
+                alertBox.className = 'alert alert-error show';
+                alertBox.textContent = 'All fields are required';
+                return;
+            }
+
+            try {
+                const res = await fetch('/coordinator/announcements', {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({ title, message, expires_at: expiresAt })
+                });
+                
+                if (!res.ok) {
+                    const data = await res.json();
+                    throw new Error(data.detail || 'Failed to post');
+                }
+                
+                alertBox.className = 'alert alert-success show';
+                alertBox.textContent = 'Announcement posted successfully!';
+                
+                document.getElementById('title').value = '';
+                document.getElementById('message').value = '';
+                
+                loadAnnouncements();
+                setTimeout(() => alertBox.classList.remove('show'), 3000);
+            } catch (err) {
+                alertBox.className = 'alert alert-error show';
+                alertBox.textContent = 'Error posting announcement';
+            }
+        }
+
+        async function deleteAnnouncement(id) {
+            if (!confirm("Are you sure you want to delete this announcement?")) return;
+            try {
+                await fetch(`/coordinator/announcements/${id}`, { method: 'DELETE', headers });
+                loadAnnouncements();
+            } catch (e) { alert("Delete failed"); }
+        }
+
+        function logout() { localStorage.clear(); window.location.href = '/static/html/login.html'; }
+        loadAnnouncements();
+    </script>
+</body>
+</html>

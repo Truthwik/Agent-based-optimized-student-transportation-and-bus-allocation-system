@@ -5,11 +5,12 @@ from typing import Optional, List, Any
 from datetime import datetime
 
 from ..database import get_db
-from ..models.models import Student, Stop, Bus, Allocation, Route, RouteStop, DayPassBooking, BusDailyCapacity
+from ..models.models import Student, Stop, Bus, Allocation, Route, RouteStop, DayPassBooking, BusDailyCapacity, Announcement, Complaint
 from ..models.schemas import (
     StudentSelectStop, StudentResponse, AllocationResponse, BusPassResponse,
     PassTypeChoice, DayPassAvailableBus, DayPassOrderResponse, DayPassConfirmRequest, DayPassResponse,
-    RouteResponse, RouteStopResponse
+    RouteResponse, RouteStopResponse, AnnouncementResponse, ComplaintCreate,
+    StopChangeRequestCreate, StopChangeRequestResponse
 )
 from ..config import RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, DAY_PASS_FARE
 from .auth import decode_token
@@ -49,7 +50,11 @@ def verify_student(authorization: str = Header(...), db: Session = Depends(get_d
 
 
 @router.get("/me", response_model=StudentResponse)
-def get_profile(student: Student = Depends(verify_student)):
+def get_profile(student: Student = Depends(verify_student), db: Session = Depends(get_db)):
+    if student.allocated_bus_id:
+        bus = db.query(Bus).filter(Bus.bus_id == student.allocated_bus_id).first()
+        if bus:
+            student.allocated_bus_number = bus.bus_number
     return student
 
 
@@ -412,3 +417,122 @@ def get_current_day_pass(
         pickup_time="7:15 AM", # In real app, fetch from RouteStop ETA
         status=booking.status
     )
+
+# ─── ANNOUNCEMENTS & COMPLAINTS ───────────────────
+@router.get("/announcements", response_model=List[AnnouncementResponse])
+def get_student_announcements(student: Student = Depends(verify_student), db: Session = Depends(get_db)):
+    bus_id = None
+    
+    # Try finding bus from permanent allocation
+    allocation = db.query(Allocation).filter(Allocation.student_id == student.student_id).first()
+    if allocation:
+        bus_id = allocation.bus_id
+    else:
+        # Try finding bus from today's day pass
+        today = datetime.now().strftime("%Y-%m-%d")
+        day_pass = db.query(DayPassBooking).filter(
+            DayPassBooking.student_id == student.student_id,
+            DayPassBooking.booking_date == today,
+            DayPassBooking.status == "confirmed"
+        ).first()
+        if day_pass:
+            bus_id = day_pass.bus_id
+            
+    if not bus_id:
+        return []
+
+    now = datetime.now()
+    announcements = db.query(Announcement).filter(
+        (Announcement.bus_id == bus_id) | (Announcement.bus_id == None),
+        Announcement.is_active == True,
+        Announcement.expires_at > now
+    ).order_by(Announcement.created_at.desc()).all()
+    
+    return announcements
+
+@router.post("/complaints")
+def create_complaint(complaint: ComplaintCreate, student: Student = Depends(verify_student), db: Session = Depends(get_db)):
+    bus_id = None
+    
+    allocation = db.query(Allocation).filter(Allocation.student_id == student.student_id).first()
+    if allocation:
+        bus_id = allocation.bus_id
+    else:
+        today = datetime.now().strftime("%Y-%m-%d")
+        day_pass = db.query(DayPassBooking).filter(
+            DayPassBooking.student_id == student.student_id,
+            DayPassBooking.booking_date == today,
+            DayPassBooking.status == "confirmed"
+        ).first()
+        if day_pass:
+            bus_id = day_pass.bus_id
+            
+    if not bus_id:
+        raise HTTPException(status_code=400, detail="You must be allocated to a bus to submit a complaint")
+
+    # Check for duplicate complaint today
+    today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    existing = db.query(Complaint).filter(
+        Complaint.student_id == student.student_id,
+        Complaint.category == complaint.category,
+        Complaint.created_at >= today_start
+    ).first()
+    
+    if existing:
+        raise HTTPException(status_code=400, detail="You have already submitted a complaint for this category today")
+
+    db_complaint = Complaint(
+        student_id=student.student_id,
+        bus_id=bus_id,
+        category=complaint.category,
+        description=complaint.description
+    )
+    db.add(db_complaint)
+    db.commit()
+    return {"message": "Your complaint has been submitted"}
+
+@router.post("/stop-change-request", response_model=StopChangeRequestResponse)
+def create_stop_change_request(
+    req: StopChangeRequestCreate, 
+    db: Session = Depends(get_db), 
+    student: Student = Depends(verify_student)
+):
+    if not student.stop_id:
+        raise HTTPException(status_code=400, detail="You do not currently have a stop to change from.")
+    if student.stop_id == req.requested_stop_id:
+        raise HTTPException(status_code=400, detail="Requested stop is identical to your current stop.")
+    
+    # Check if a pending request already exists
+    from ..models.models import StopChangeRequest
+    existing = db.query(StopChangeRequest).filter(
+        StopChangeRequest.student_id == student.student_id,
+        StopChangeRequest.status == "pending"
+    ).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="You already have a pending stop change request.")
+
+    new_request = StopChangeRequest(
+        student_id=student.student_id,
+        current_stop_id=student.stop_id,
+        requested_stop_id=req.requested_stop_id,
+        reason=req.reason,
+        status="pending"
+    )
+    db.add(new_request)
+    db.commit()
+    db.refresh(new_request)
+    
+    current_stop = db.query(Stop).filter(Stop.stop_id == student.stop_id).first()
+    req_stop = db.query(Stop).filter(Stop.stop_id == req.requested_stop_id).first()
+    
+    return {
+        "id": new_request.id,
+        "student_id": student.student_id,
+        "student_name": student.name,
+        "current_stop_name": current_stop.stop_name if current_stop else "Unknown",
+        "requested_stop_name": req_stop.stop_name if req_stop else "Unknown",
+        "requested_stop_id": req.requested_stop_id,
+        "reason": new_request.reason,
+        "status": new_request.status,
+        "created_at": str(new_request.created_at)
+    }

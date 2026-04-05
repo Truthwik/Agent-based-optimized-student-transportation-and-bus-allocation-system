@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 from typing import Optional, List
+from datetime import datetime
 
 
 # ─── Auth ──────────────────────────────────────────
@@ -112,6 +113,7 @@ class StudentResponse(BaseModel):
     bus_required: bool
     stop_id: Optional[int] = None
     allocated_bus_id: Optional[int] = None
+    allocated_bus_number: Optional[str] = None
     allocation_type: Optional[str] = None
 
     class Config:
@@ -172,3 +174,118 @@ class BusPassResponse(BaseModel):
     driver_name: Optional[str] = None
     driver_phone: Optional[str] = None
     reporting_time: str = "7:00 AM"
+
+
+# ─── Coordinator ───────────────────────────────────
+class CoordinatorCreate(BaseModel):
+    name: str
+    employee_id: str
+    email: str
+    phone: str
+    bus_id: int
+
+class CoordinatorUpdate(BaseModel):
+    name: Optional[str] = None
+    employee_id: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    bus_id: Optional[int] = None
+    is_active: Optional[bool] = None
+
+class CoordinatorResponse(BaseModel):
+    id: int
+    name: str
+    employee_id: str
+    email: str
+    phone: str
+    bus_id: int
+    bus_number: Optional[str] = None
+    is_active: bool
+
+    class Config:
+        from_attributes = True
+
+# ─── Announcement ──────────────────────────────────
+class AnnouncementCreate(BaseModel):
+    title: str
+    message: str
+    expires_at: str
+
+class AnnouncementResponse(BaseModel):
+    id: int
+    title: str
+    message: str
+    created_at: datetime
+    expires_at: datetime
+    is_active: bool
+    bus_id: Optional[int] = None
+
+    class Config:
+        from_attributes = True
+
+# ─── Complaint ─────────────────────────────────────
+class ComplaintCreate(BaseModel):
+    category: str
+    description: str
+
+class ComplaintResolve(BaseModel):
+    resolution_note: str
+
+class ComplaintResponse(BaseModel):
+    id: int
+    student_name: str
+    roll_number: str
+    category: str
+    description: str
+    status: str
+    created_at: str
+    resolution_note: Optional[str] = None
+    resolved_at: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+# ─── Coordinator Dashboard ─────────────────────────
+class CoordinatorDashboardBus(BaseModel):
+    bus_number: str
+    max_capacity: int
+    driver_name: Optional[str] = None
+    driver_phone: Optional[str] = None
+
+class CoordinatorDashboardSummary(BaseModel):
+    total_students_allocated: int
+    yearwise_students: int
+    daypass_students_today: int
+    available_seats: int
+    occupancy_percent: int
+    bus_is_live: bool
+    open_complaints: int
+    active_announcements: int
+
+class CoordinatorDashboardResponse(BaseModel):
+    coordinator: CoordinatorResponse
+    bus: CoordinatorDashboardBus
+    summary: CoordinatorDashboardSummary
+
+# ─── Stop Change Request ───────────────────────────
+class StopChangeRequestCreate(BaseModel):
+    requested_stop_id: int
+    reason: str
+
+class StopChangeRequestResponse(BaseModel):
+    id: int
+    student_id: str
+    student_name: str
+    current_stop_name: str
+    requested_stop_name: str
+    requested_stop_id: int
+    reason: str
+    status: str
+    created_at: str
+    projected_bus_number: Optional[str] = None
+    projected_bus_capacity: Optional[int] = None
+    projected_bus_allocated: Optional[int] = None
+    resolved_at: Optional[str] = None
+
+    class Config:
+        from_attributes = True

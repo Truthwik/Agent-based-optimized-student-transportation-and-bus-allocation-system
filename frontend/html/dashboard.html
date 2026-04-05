@@ -17,6 +17,7 @@
                 </div>
                 <ul class="navbar-links">
                     <li><a href="/static/html/dashboard.html" class="active">Dashboard</a></li>
+                    <li><a href="/static/html/student-announcements.html">Announcements</a></li>
                     <li><a href="/static/html/select-stop.html">Select Stop</a></li>
                     <li><a href="/static/html/view-allocation.html">My Allocation</a></li>
                     <li><a href="/static/html/bus-pass.html">Bus Pass</a></li>
@@ -33,6 +34,8 @@
                     <h1>Welcome back, <span id="studentName">Student</span> 👋</h1>
                     <p class="subtitle">Manage your bus service and view allocations</p>
                 </div>
+
+                <div id="announcementBanner" style="margin-bottom: 24px;"></div>
 
                 <div class="cards-grid slide-up" style="animation-delay: 0.1s;">
                     <a href="/static/html/select-stop.html" class="nav-card">
@@ -111,6 +114,7 @@
                             <p id="stopStatus" style="font-weight: 600; margin-top: 4px;">-</p>
                         </div>
                     </div>
+                    <button class="btn btn-secondary" onclick="showComplaintModal()" style="margin-top: 16px; width: 100%; border: 1px dashed var(--glass-border); color: var(--text-secondary);">🔔 Report an Issue</button>
                 </div>
 
                 <!-- Track My Bus Card (Always Visible) -->
@@ -124,6 +128,32 @@
                     </div>
                     <div id="trackingStatusBar" style="margin-top: 14px; padding: 10px 14px; border-radius: 10px; font-size: 0.85rem; font-weight: 600;"></div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Complaint Modal -->
+    <div class="modal-overlay" id="complaintModal">
+        <div class="modal">
+            <h2 id="modalTitle">Report an Issue</h2>
+            <div id="complaintAlert" class="alert"></div>
+            <div class="form-group">
+                <label>Category</label>
+                <select id="complaintCategory" class="form-control" required>
+                    <option value="overcrowding">Overcrowding</option>
+                    <option value="driver_behavior">Driver Behavior</option>
+                    <option value="late_arrival">Late Arrival</option>
+                    <option value="stop_issue">Stop Issue</option>
+                    <option value="other">Other</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Description</label>
+                <textarea id="complaintDesc" class="form-control" rows="4" placeholder="Briefly describe the issue..." required></textarea>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeComplaintModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="submitComplaint()">Submit Report</button>
             </div>
         </div>
     </div>
@@ -241,12 +271,82 @@
             }
         }
 
+        // Announcements
+        async function loadAnnouncements() {
+            try {
+                const res = await fetch('/students/announcements', { headers: { 'Authorization': `Bearer ${token}` } });
+                const anns = await res.json();
+                
+                if (anns.length > 0) {
+                    const banner = document.getElementById('announcementBanner');
+                    let html = '';
+                    anns.forEach((a, index) => {
+                        html += `
+                        <div class="glass-card slide-up" style="background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--accent-blue); padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; animation-delay: ${index * 0.1}s;">
+                            <div style="flex: 1;">
+                                <strong style="color: var(--accent-blue);">📢 ${a.title}</strong>
+                                <p style="margin: 4px 0 0; font-size: 0.9rem;">${a.message}</p>
+                            </div>
+                            <button onclick="this.parentElement.style.display='none'" style="background:none; border:none; color:var(--text-secondary); font-size: 1.2rem; cursor: pointer; padding: 4px 8px;">&times;</button>
+                        </div>`;
+                    });
+                    banner.innerHTML = html;
+                }
+            } catch (err) {}
+        }
+
+        // Complaints
+        function showComplaintModal() {
+            document.getElementById('complaintAlert').className = 'alert';
+            document.getElementById('complaintDesc').value = '';
+            document.getElementById('complaintModal').classList.add('show');
+        }
+
+        function closeComplaintModal() {
+            document.getElementById('complaintModal').classList.remove('show');
+        }
+
+        async function submitComplaint() {
+            const category = document.getElementById('complaintCategory').value;
+            const description = document.getElementById('complaintDesc').value;
+            const alertBox = document.getElementById('complaintAlert');
+
+            if (!description.trim()) {
+                alertBox.className = 'alert alert-error show';
+                alertBox.textContent = 'Description is required';
+                return;
+            }
+
+            try {
+                const res = await fetch('/students/complaints', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ category, description })
+                });
+                
+                if (!res.ok) {
+                    const data = await res.json();
+                    alertBox.className = 'alert alert-error show';
+                    alertBox.textContent = data.detail || 'Failed to submit';
+                    return;
+                }
+
+                alertBox.className = 'alert alert-success show';
+                alertBox.textContent = 'Report submitted successfully!';
+                setTimeout(() => { closeComplaintModal(); }, 1500);
+            } catch (err) {
+                alertBox.className = 'alert alert-error show';
+                alertBox.textContent = 'Connection error';
+            }
+        }
+
         function logout() {
             localStorage.clear();
             window.location.href = '/static/html/login.html';
         }
 
         loadProfile();
+        loadAnnouncements();
     </script>
 </body>
 </html>

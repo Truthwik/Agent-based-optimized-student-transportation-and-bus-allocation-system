@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Route & Stops | Coordinator Portal</title>
+    <link rel="stylesheet" href="/static/css/style.css?v=logo-theme-1">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+</head>
+<body>
+    <div class="page-wrapper">
+        <nav class="navbar">
+            <div class="container">
+                <div class="navbar-brand">
+                    <img class="logo-img" src="/static/img/logo.png" alt="Logo" width="32" height="32">
+                    Coordinator Portal
+                </div>
+                <ul class="navbar-links">
+                    <li><a href="/static/html/coordinator/dashboard.html">Dashboard</a></li>
+                    <li><a href="/static/html/coordinator/students.html">Students</a></li>
+                    <li><a href="/static/html/coordinator/tracking.html">Live Tracking</a></li>
+                    <li><a href="/static/html/coordinator/route.html" class="active">Route</a></li>
+                    <li><a href="/static/html/coordinator/daypass.html">Day Pass</a></li>
+                    <li><a href="/static/html/coordinator/profile.html">Profile</a></li>
+                    <li><a href="#" class="btn-logout" onclick="logout()">Logout</a></li>
+                </ul>
+            </div>
+        </nav>
+
+        <div class="dashboard-content">
+            <div class="container">
+                <div class="page-header slide-up">
+                    <h1 id="routeTitle">🗺️ Route & Stops</h1>
+                    <p class="subtitle" id="routeStats">Loading...</p>
+                </div>
+
+                <div class="glass-card slide-up" style="padding: 0; margin-bottom: 24px; animation-delay: 0.1s;">
+                    <div id="map" style="height: 400px; width: 100%; border-radius: 12px;"></div>
+                </div>
+
+                <div class="glass-card slide-up" style="padding: 0; animation-delay: 0.2s;">
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Seq</th>
+                                    <th>Stop Name</th>
+                                    <th>Pickup Time</th>
+                                    <th>Assigned Students</th>
+                                </tr>
+                            </thead>
+                            <tbody id="stopsTable">
+                                <tr><td colspan="4" style="text-align:center;padding:40px;">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        const token = localStorage.getItem('token');
+        if (!token || localStorage.getItem('role') !== 'coordinator') window.location.href = '/static/html/login.html';
+        const headers = { 'Authorization': `Bearer ${token}` };
+
+        async function init() {
+            try {
+                const res = await fetch('/coordinator/route', { headers });
+                if (!res.ok) {
+                    if(res.status === 401) logout();
+                    document.getElementById('routeStats').textContent = "No route assigned.";
+                    document.getElementById('stopsTable').innerHTML = '<tr><td colspan="4" class="empty-state">No route mapped</td></tr>';
+                    return;
+                }
+                const data = await res.json();
+                
+                document.getElementById('routeTitle').innerHTML = `🗺️ ${data.route_name}`;
+                document.getElementById('routeStats').textContent = `${data.stops.length} stops • ${data.total_distance_km.toFixed(1)} km`;
+
+                initMap(data.stops);
+                renderTable(data.stops);
+            } catch (err) { console.error(err); }
+        }
+
+        function initMap(stops) {
+            const map = L.map('map', { attributionControl: false });
+            L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+
+            const bounds = [];
+            const latlngs = [];
+
+            stops.forEach((stop, index) => {
+                const coord = [stop.latitude, stop.longitude];
+                latlngs.push(coord);
+                bounds.push(coord);
+
+                const icon = L.divIcon({
+                    html: `<div style="background:var(--accent-blue);color:white;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:12px;border:2px solid white;box-shadow:0 2px 4px rgba(0,0,0,0.3)">${index + 1}</div>`,
+                    className: '',
+                    iconSize: [24, 24],
+                    iconAnchor: [12, 12]
+                });
+
+                L.marker(coord, { icon }).addTo(map)
+                    .bindPopup(`<b>${index + 1}. ${stop.stop_name}</b><br>Students: ${stop.student_count}`);
+            });
+
+            // BVRIT College
+            const collegeCoord = [17.5218, 78.5542];
+            bounds.push(collegeCoord);
+            latlngs.push(collegeCoord);
+
+            L.marker(collegeCoord, {
+                icon: L.divIcon({ html: `<div style="font-size:28px; transform:translate(-10px, -20px)">🏫</div>`, className: '' })
+            }).addTo(map).bindPopup('<b>🏢 BVRIT Campus</b>');
+
+            // Draw line
+            L.polyline(latlngs, { color: '#3b82f6', weight: 4, opacity: 0.7, dashArray: '10, 10' }).addTo(map);
+
+            if(bounds.length > 0) {
+                map.fitBounds(L.latLngBounds(bounds), { padding: [40, 40] });
+            }
+        }
+
+        function renderTable(stops) {
+            const tbody = document.getElementById('stopsTable');
+            tbody.innerHTML = stops.map((s, idx) => `
+                <tr>
+                    <td><div style="background:var(--accent-blue);color:white;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px">${idx + 1}</div></td>
+                    <td><strong>${s.stop_name}</strong></td>
+                    <td>${s.pickup_time}</td>
+                    <td>${s.student_count}</td>
+                </tr>
+            `).join('');
+        }
+
+        function logout() { localStorage.clear(); window.location.href = '/static/html/login.html'; }
+        init();
+    </script>
+</body>
+</html>

@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stop Change Requests | Admin Portal</title>
+    <link rel="stylesheet" href="../css/style.css?v=1.2">
+    <style>
+        .tabs { display: flex; gap: 16px; margin-bottom: 24px; border-bottom: 1px solid var(--glass-border); padding-bottom: 12px; }
+        .tab { background: none; border: none; color: var(--text-secondary); font-size: 1rem; font-weight: 600; cursor: pointer; padding: 8px 16px; border-radius: 8px; transition: all 0.3s; }
+        .tab.active { background: rgba(255,255,255,0.1); color: var(--text-primary); }
+        .r-card { border-left: 4px solid; padding: 16px 20px; }
+        .r-card.pending { border-left-color: #ef4444; }
+        .r-card.approved { border-left-color: #10b981; opacity: 0.8; }
+        .r-card.rejected { border-left-color: #64748b; opacity: 0.8; }
+    </style>
+</head>
+<body>
+    <div class="page-wrapper">
+        <nav class="navbar">
+            <div class="container">
+                <div class="navbar-brand">
+                    <img class="logo-img" src="../img/logo.png" alt="Vishnu Logo" width="32" height="32">
+                    Admin Portal
+                </div>
+                <ul class="navbar-links">
+                    <li><a href="admin-dashboard.html">Dashboard</a></li>
+                    <li><a href="students.html">Students</a></li>
+                    <li><a href="admin-requests.html" class="active">Requests</a></li>
+                    <li><a href="manage-coordinators.html">Coordinators</a></li>
+                    <li><a href="routes.html">Routes</a></li>
+                    <li><a href="#" class="btn-logout" onclick="logout()">Logout</a></li>
+                </ul>
+            </div>
+        </nav>
+
+        <div class="dashboard-content">
+            <div class="container">
+                <div class="page-header slide-up">
+                    <h1>📬 Stop Change Requests</h1>
+                    <p class="subtitle" id="statsText">Review and process student stop change applications</p>
+                </div>
+
+                <div class="tabs slide-up" style="animation-delay: 0.1s;">
+                    <button class="tab active" onclick="setFilter('pending', this)">Pending <span id="pendingCount" class="badge" style="background:#ef4444;color:white;margin-left:8px;">0</span></button>
+                    <button class="tab" onclick="setFilter('approved', this)">Approved</button>
+                    <button class="tab" onclick="setFilter('rejected', this)">Rejected</button>
+                    <button class="tab" onclick="setFilter('all', this)">All</button>
+                </div>
+
+                <div id="alert" class="alert slide-up" style="animation-delay: 0.1s;"></div>
+
+                <div id="requestsContainer" class="slide-up" style="animation-delay: 0.2s; display: grid; gap: 16px;">
+                    <div style="text-align:center; padding:40px;">Loading...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const token = localStorage.getItem('token');
+        if (!token || localStorage.getItem('role') !== 'admin') window.location.href = 'admin-login.html';
+        const headers = { 'Authorization': `Bearer ${token}` };
+
+        let allRequests = [];
+        let currentFilter = 'pending';
+
+        async function loadRequests() {
+            try {
+                const res = await fetch('/admin/stop-change-requests', { headers });
+                if (!res.ok) { if(res.status === 401) logout(); return; }
+                allRequests = await res.json();
+                
+                const pendingData = allRequests.filter(c => c.status === 'pending');
+                document.getElementById('pendingCount').textContent = pendingData.length;
+                
+                renderRequests();
+            } catch (err) { console.error(err); }
+        }
+
+        function setFilter(filter, btnElement) {
+            currentFilter = filter;
+            document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+            btnElement.classList.add('active');
+            renderRequests();
+        }
+
+        function renderRequests() {
+            const container = document.getElementById('requestsContainer');
+            const data = currentFilter === 'all' ? allRequests : allRequests.filter(c => c.status === currentFilter);
+
+            if (data.length === 0) {
+                container.innerHTML = `<div class="glass-card empty-state">No ${currentFilter === 'all' ? '' : currentFilter} requests found</div>`;
+                return;
+            }
+
+            container.innerHTML = data.map(r => `
+                <div class="glass-card r-card ${r.status}">
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px;">
+                        <div>
+                            <div style="display:flex; align-items:center; gap:12px; margin-bottom:8px">
+                                ${r.status === 'pending' 
+                                    ? '<span style="background:rgba(239,68,68,0.1); color:#ef4444; padding:4px 8px; border-radius:4px; font-size:0.75rem; font-weight:700">🔴 PENDING</span>'
+                                    : (r.status === 'approved' 
+                                        ? '<span style="background:rgba(16,185,129,0.1); color:#10b981; padding:4px 8px; border-radius:4px; font-size:0.75rem; font-weight:700">🟢 APPROVED</span>'
+                                        : '<span style="background:rgba(100,116,139,0.1); color:#64748b; padding:4px 8px; border-radius:4px; font-size:0.75rem; font-weight:700">⚫ REJECTED</span>'
+                                    )
+                                }
+                                <span style="color:var(--text-secondary); font-size:0.8rem">${new Date(r.created_at).toLocaleString()}</span>
+                            </div>
+                            <h3 style="margin:0 0 4px 0">${r.student_name} <span style="color:var(--accent-blue); font-size:0.9rem; margin-left:8px">${r.student_id}</span></h3>
+                            
+                            <div style="margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; font-size: 0.95rem;">
+                                <div>
+                                    <span style="color:var(--text-secondary); font-size:0.8rem; text-transform:uppercase;">Current Stop</span>
+                                    <strong style="display:block">${r.current_stop_name}</strong>
+                                </div>
+                                <div style="border-left: 1px solid var(--glass-border); padding-left: 16px;">
+                                    <span style="color:var(--text-secondary); font-size:0.8rem; text-transform:uppercase;">Requested Stop</span>
+                                    <strong style="display:block; color:var(--accent-blue)">${r.requested_stop_name}</strong>
+                                </div>
+                            </div>
+                            
+                            <div style="margin-top: 12px; background: rgba(0,0,0,0.1); border-radius: 8px; padding: 12px; border: 1px dashed ${!r.projected_bus_number ? '#ef4444' : 'var(--primary-accent)'};">
+                                <span style="color:var(--text-secondary); font-size:0.85rem;">Projected Route Change:</span>
+                                ${!r.projected_bus_number ? `
+                                    <strong style="display:block; color:#ef4444; margin-top:4px;">⚠️ No bus currently services the requested stop!</strong>
+                                ` : `
+                                    <div style="display: flex; gap: 16px; margin-top:4px;">
+                                        <span>New Bus: <strong>${r.projected_bus_number}</strong></span>
+                                        <span style="${r.projected_bus_allocated >= r.projected_bus_capacity ? 'color:#ef4444' : 'color:#10b981'}">
+                                            Capacity: <strong>${r.projected_bus_allocated}/${r.projected_bus_capacity}</strong>
+                                        </span>
+                                    </div>
+                                `}
+                            </div>
+
+                            <div style="margin-top: 12px; font-size:0.95rem; color:var(--text-secondary)">
+                                <strong>Reason:</strong> ${r.reason}
+                            </div>
+                        </div>
+                        
+                        ${r.status === 'pending' 
+                            ? `<div style="display: flex; gap: 8px; flex-direction: column;">
+                                <button class="btn btn-primary" onclick="actionRequest(${r.id}, 'approve')" ${!r.projected_bus_number ? 'disabled title="Cannot approve without an assigned route"' : ''}>Approve ✓</button>
+                                <button class="btn btn-secondary" style="border-color:#ef4444; color:#ef4444;" onclick="actionRequest(${r.id}, 'reject')">Reject ✕</button>
+                               </div>`
+                            : `<div style="font-size:0.85rem; color:var(--text-secondary)">Resolved at:<br>${new Date(r.resolved_at).toLocaleString()}</div>`
+                        }
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function actionRequest(id, action) {
+            const endpoint = action === 'approve' ? `/admin/stop-change-requests/${id}/approve` : `/admin/stop-change-requests/${id}/reject`;
+            const alertBox = document.getElementById('alert');
+            
+            if (action === 'approve' && !confirm("Are you sure you want to approve this request? The student will be permanently reassigned to the new bus.")) return;
+            if (action === 'reject' && !confirm("Are you sure you want to reject this request?")) return;
+
+            try {
+                const res = await fetch(endpoint, { method: 'POST', headers });
+                const data = await res.json();
+                
+                if (res.ok) {
+                    alertBox.className = 'alert alert-success show';
+                    alertBox.textContent = `Request ${action}d successfully!`;
+                    loadRequests(); // Refresh table
+                } else {
+                    alertBox.className = 'alert alert-error show';
+                    alertBox.textContent = data.detail || 'Failed to process request';
+                }
+                setTimeout(() => alertBox.classList.remove('show'), 4000);
+            } catch (err) {
+                alertBox.className = 'alert alert-error show';
+                alertBox.textContent = 'Connection error';
+            }
+        }
+
+        function logout() { localStorage.clear(); window.location.href = 'admin-login.html'; }
+        loadRequests();
+    </script>
+</body>
+</html>

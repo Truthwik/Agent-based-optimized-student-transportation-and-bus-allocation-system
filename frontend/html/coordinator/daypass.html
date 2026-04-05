@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Day Pass Students | Coordinator Portal</title>
+    <link rel="stylesheet" href="/static/css/style.css?v=logo-theme-1">
+</head>
+<body>
+    <div class="page-wrapper">
+        <nav class="navbar">
+            <div class="container">
+                <div class="navbar-brand">
+                    <img class="logo-img" src="/static/img/logo.png" alt="Logo" width="32" height="32">
+                    Coordinator Portal
+                </div>
+                <ul class="navbar-links">
+                    <li><a href="/static/html/coordinator/dashboard.html">Dashboard</a></li>
+                    <li><a href="/static/html/coordinator/students.html">Students</a></li>
+                    <li><a href="/static/html/coordinator/tracking.html">Live Tracking</a></li>
+                    <li><a href="/static/html/coordinator/route.html">Route</a></li>
+                    <li><a href="/static/html/coordinator/daypass.html" class="active">Day Pass</a></li>
+                    <li><a href="/static/html/coordinator/profile.html">Profile</a></li>
+                    <li><a href="#" class="btn-logout" onclick="logout()">Logout</a></li>
+                </ul>
+            </div>
+        </nav>
+
+        <div class="dashboard-content">
+            <div class="container">
+                <div class="page-header slide-up">
+                    <h1>🎫 Day Pass Today</h1>
+                    <p class="subtitle" id="countText">Loading bookings...</p>
+                </div>
+
+                <div class="glass-card slide-up" style="padding: 0; animation-delay: 0.1s;">
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Booking ID</th>
+                                    <th>Student</th>
+                                    <th>Stop & Time</th>
+                                    <th>Payment ID</th>
+                                </tr>
+                            </thead>
+                            <tbody id="daypassTable">
+                                <tr><td colspan="4" style="text-align:center;padding:40px;">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const token = localStorage.getItem('token');
+        if (!token || localStorage.getItem('role') !== 'coordinator') window.location.href = '/static/html/login.html';
+        const headers = { 'Authorization': `Bearer ${token}` };
+
+        async function init() {
+            try {
+                const res = await fetch('/coordinator/daypass/today', { headers });
+                if (!res.ok) {
+                    if(res.status === 401) logout();
+                    return;
+                }
+                const data = await res.json();
+                
+                document.getElementById('countText').textContent = `${data.length} confirmed day passes for today`;
+                const tbody = document.getElementById('daypassTable');
+
+                if (data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" class="empty-state">No day passes booked for today</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = data.map(b => `
+                    <tr>
+                        <td><strong>#${b.booking_id}</strong></td>
+                        <td>
+                            <strong style="color:var(--accent-blue)">${b.roll_number}</strong>
+                            <div style="font-size:0.9rem">${b.student_name} (Year ${b.year_of_study})</div>
+                        </td>
+                        <td>
+                            <span style="display:block">${b.stop_name}</span>
+                            <small style="color:var(--text-secondary)">~${b.pickup_time}</small>
+                        </td>
+                        <td><small style="font-family:monospace">${b.payment_id || 'N/A'}</small></td>
+                    </tr>
+                `).join('');
+            } catch (err) { console.error(err); }
+        }
+
+        function logout() { localStorage.clear(); window.location.href = '/static/html/login.html'; }
+        init();
+    </script>
+</body>
+</html>

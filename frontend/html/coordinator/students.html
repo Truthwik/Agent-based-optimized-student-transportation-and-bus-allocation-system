@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Students | Coordinator Portal</title>
+    <link rel="stylesheet" href="/static/css/style.css?v=logo-theme-1">
+    <style>
+        .filters { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+        .filter-input { background: var(--input-bg); border: 1px solid var(--glass-border); padding: 10px 14px; border-radius: 8px; color: var(--text-primary); outline: none; }
+    </style>
+</head>
+<body>
+    <div class="page-wrapper">
+        <nav class="navbar">
+            <div class="container">
+                <div class="navbar-brand">
+                    <img class="logo-img" src="/static/img/logo.png" alt="Logo" width="32" height="32">
+                    Coordinator Portal
+                </div>
+                <ul class="navbar-links">
+                    <li><a href="/static/html/coordinator/dashboard.html">Dashboard</a></li>
+                    <li><a href="/static/html/coordinator/students.html" class="active">Students</a></li>
+                    <li><a href="/static/html/coordinator/tracking.html">Live Tracking</a></li>
+                    <li><a href="/static/html/coordinator/route.html">Route</a></li>
+                    <li><a href="/static/html/coordinator/daypass.html">Day Pass</a></li>
+                    <li><a href="/static/html/coordinator/profile.html">Profile</a></li>
+                    <li><a href="#" class="btn-logout" onclick="logout()">Logout</a></li>
+                </ul>
+            </div>
+        </nav>
+
+        <div class="dashboard-content">
+            <div class="container">
+                <div class="page-header slide-up">
+                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
+                        <div>
+                            <h1>👥 My Students</h1>
+                            <p class="subtitle" id="countText">Loading students...</p>
+                        </div>
+                        <button class="btn btn-secondary" onclick="exportCSV()">📥 Export CSV</button>
+                    </div>
+                </div>
+
+                <div class="filters slide-up" style="animation-delay: 0.1s;">
+                    <input type="text" id="search" class="filter-input" placeholder="Search name or roll..." style="flex:1; min-width:200px" oninput="filterTable()">
+                    <select id="yearFilter" class="filter-input" onchange="filterTable()">
+                        <option value="">All Years</option>
+                        <option value="1">1st Year</option>
+                        <option value="2">2nd Year</option>
+                        <option value="3">3rd Year</option>
+                        <option value="4">4th Year</option>
+                    </select>
+                </div>
+
+                <div class="glass-card slide-up" style="padding: 0; animation-delay: 0.2s;">
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Roll Number</th>
+                                    <th>Name</th>
+                                    <th>Year</th>
+                                    <th>Stop & Time</th>
+                                    <th>Phone</th>
+                                </tr>
+                            </thead>
+                            <tbody id="studentsTable">
+                                <tr><td colspan="5" style="text-align:center;padding:40px;">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const token = localStorage.getItem('token');
+        if (!token || localStorage.getItem('role') !== 'coordinator') window.location.href = '/static/html/login.html';
+        const headers = { 'Authorization': `Bearer ${token}` };
+        let allStudents = [];
+
+        async function init() {
+            try {
+                const res = await fetch('/coordinator/students?sort=name', { headers });
+                if (!res.ok) {
+                    if(res.status === 401) logout();
+                    return;
+                }
+                allStudents = await res.json();
+                filterTable();
+            } catch (err) { console.error(err); }
+        }
+
+        function filterTable() {
+            const search = document.getElementById('search').value.toLowerCase();
+            const yearStr = document.getElementById('yearFilter').value;
+            
+            const filtered = allStudents.filter(s => {
+                const matchSearch = s.name.toLowerCase().includes(search) || s.roll_number.toLowerCase().includes(search);
+                const matchYear = yearStr ? s.year_of_study.toString() === yearStr : true;
+                return matchSearch && matchYear;
+            });
+
+            renderTable(filtered);
+        }
+
+        function renderTable(data) {
+            document.getElementById('countText').textContent = `Showing ${data.length} allocated students`;
+            const tbody = document.getElementById('studentsTable');
+            
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No students found matching criteria</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = data.map(s => `
+                <tr>
+                    <td><strong>${s.roll_number}</strong></td>
+                    <td>${s.name}</td>
+                    <td>Year ${s.year_of_study}</td>
+                    <td>
+                        <span style="display:block">${s.stop_name}</span>
+                        <small style="color:var(--text-secondary)">~${s.pickup_time}</small>
+                    </td>
+                    <td>${s.phone || '-'}</td>
+                </tr>
+            `).join('');
+        }
+
+        async function exportCSV() {
+            try {
+                const res = await fetch('/coordinator/students/export', { headers });
+                const blob = await res.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `bus_students.csv`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+            } catch (e) { alert('Export failed'); }
+        }
+
+        function logout() { localStorage.clear(); window.location.href = '/static/html/login.html'; }
+        init();
+    </script>
+</body>
+</html>

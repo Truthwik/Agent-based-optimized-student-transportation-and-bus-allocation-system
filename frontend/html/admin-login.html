@@ -97,15 +97,22 @@
                 return;
             }
 
-            if (data.role !== 'admin') {
+            if (data.role !== 'admin' && data.role !== 'coordinator') {
                 alert.className = 'alert alert-error show';
-                alert.textContent = 'Please use the student login page';
+                alert.textContent = 'Please use the student or driver login page';
                 return;
             }
 
             localStorage.setItem('token', data.token);
-            localStorage.setItem('role', 'admin');
-            window.location.href = 'admin-dashboard.html';
+            localStorage.setItem('role', data.role);
+            if (data.bus_id) localStorage.setItem('bus_id', data.bus_id);
+
+            if (data.role === 'admin') {
+                window.location.href = 'admin-dashboard.html';
+            } else {
+                // Coordinator
+                window.location.href = '/static/html/coordinator/dashboard.html';
+            }
         });
     </script>
 </body>

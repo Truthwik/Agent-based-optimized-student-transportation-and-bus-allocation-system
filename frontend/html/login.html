@@ -110,6 +110,11 @@
                 alert.textContent = 'Please use the admin login page';
                 return;
             }
+            if (data.role === 'coordinator') {
+                alert.className = 'alert alert-error show';
+                alert.textContent = 'Please use the employee login page';
+                return;
+            }
 
             localStorage.setItem('token', data.token);
             localStorage.setItem('role', data.role);

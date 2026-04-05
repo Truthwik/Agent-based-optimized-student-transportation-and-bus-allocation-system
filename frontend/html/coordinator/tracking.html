@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Tracking | Coordinator Portal</title>
+    <link rel="stylesheet" href="/static/css/style.css?v=logo-theme-1">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        .map-container { position: relative; height: calc(100vh - 72px); width: 100%; margin-top: 72px; }
+        #map { height: 100%; width: 100%; }
+        .glass-panel {
+            position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%);
+            width: 90%; max-width: 500px; z-index: 1000;
+            background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px;
+            padding: 20px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3); color: white;
+        }
+        .bus-marker { filter: drop-shadow(0 4px 6px rgba(0,0,0,0.4)); transition: all 0.5s ease; }
+    </style>
+</head>
+<body style="overflow: hidden; margin: 0;">
+    <nav class="navbar" style="position: fixed; top: 0; width: 100%; z-index: 2000;">
+        <div class="container">
+            <div class="navbar-brand">
+                <a href="/static/html/coordinator/dashboard.html" style="color:white; text-decoration:none">🔙 Dashboard</a>
+            </div>
+                <ul class="navbar-links">
+                    <li><a href="/static/html/coordinator/dashboard.html">Dashboard</a></li>
+                    <li><a href="/static/html/coordinator/students.html">Students</a></li>
+                    <li><a href="/static/html/coordinator/tracking.html" class="active">Live Tracking</a></li>
+                    <li><a href="/static/html/coordinator/route.html">Route</a></li>
+                    <li><a href="/static/html/coordinator/daypass.html">Day Pass</a></li>
+                    <li><a href="/static/html/coordinator/profile.html">Profile</a></li>
+                    <li><a href="#" class="btn-logout" onclick="logout()">Logout</a></li>
+                </ul>
+        </div>
+    </nav>
+
+    <div class="map-container">
+        <div id="map"></div>
+        <div class="glass-panel slide-up">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:16px">
+                <div>
+                    <h3 style="margin:0" id="panelBusName">Bus #--</h3>
+                    <div style="font-size:0.85rem; color: #94a3b8; margin-top:4px" id="panelRouteName">Loading route...</div>
+                </div>
+                <div id="statusBadge" style="background: rgba(255,255,255,0.1); padding: 4px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: 600;">Bus not started</div>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 0.9rem;" id="trackingStats">
+                <div>🚀 Speed: <strong id="speedVal">--</strong> km/h</div>
+                <div>📶 Accuracy: <strong id="accVal">--</strong> m</div>
+                <div style="grid-column: span 2; display: flex; justify-content: space-between; margin-top: 8px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.1);">
+                    <span style="color: #94a3b8" id="lastPingText">Waiting for driver to start...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        const token = localStorage.getItem('token');
+        if (!token || localStorage.getItem('role') !== 'coordinator') window.location.href = '/static/html/login.html';
+        
+        let map, busMarker;
+        let ws;
+        let busId = null;
+
+        async function init() {
+            try {
+                const meRes = await fetch('/coordinator/me', { headers: { 'Authorization': `Bearer ${token}` } });
+                const meData = await meRes.json();
+                busId = meData.bus.bus_id;
+                document.getElementById('panelBusName').textContent = `Bus ${meData.bus.bus_number}`;
+
+                const rtRes = await fetch('/coordinator/route', { headers: { 'Authorization': `Bearer ${token}` } });
+                if(rtRes.ok) {
+                    const rtData = await rtRes.json();
+                    document.getElementById('panelRouteName').textContent = rtData.route_name;
+                    initMap(rtData.stops);
+                } else {
+                    initMap([]);
+                }
+
+                connectWebSocket();
+            } catch (err) { console.error(err); }
+        }
+
+        function initMap(stops) {
+            map = L.map('map', { zoomControl: false }).setView([17.5218, 78.5542], 12);
+            L.control.zoom({ position: 'topright' }).addTo(map);
+            L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+
+            const collegeIcon = L.divIcon({ html: `<div style="font-size:32px; transform:translate(-10px,-20px)">🏫</div>`, className: '' });
+            L.marker([17.5218, 78.5542], { icon: collegeIcon }).addTo(map).bindPopup('<b>BVRIT Campus</b>');
+
+            const latlngs = [];
+            stops.forEach((stop, index) => {
+                const coord = [stop.latitude, stop.longitude];
+                latlngs.push(coord);
+                L.marker(coord, {
+                    icon: L.divIcon({ html: `<div style="background:var(--accent-blue);color:white;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:bold;border:2px solid white;">${index+1}</div>`, className: '' })
+                }).addTo(map);
+            });
+            latlngs.push([17.5218, 78.5542]);
+            if(latlngs.length > 1) L.polyline(latlngs, { color: '#3b82f6', weight: 4, opacity: 0.5, dashArray: '10, 10' }).addTo(map);
+            
+            const bIcon = L.divIcon({
+                html: `<div style="font-size:36px; transform:translate(-15px,-15px)">🚌</div>`,
+                className: 'bus-marker'
+            });
+            busMarker = L.marker([17.5218, 78.5542], { icon: bIcon }).addTo(map).setOpacity(0);
+        }
+
+        function connectWebSocket() {
+            if (!busId) return;
+            const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            ws = new WebSocket(`${wsProtocol}//${window.location.host}/ws/tracking/${busId}?token=${token}`);
+
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                if (data.error) return;
+                updatePanel(data);
+            };
+
+            ws.onclose = () => {
+                document.getElementById('statusBadge').textContent = 'Disconnected';
+                document.getElementById('statusBadge').style.background = '#ef4444';
+                setTimeout(connectWebSocket, 3000);
+            };
+        }
+
+        function updatePanel(data) {
+            const badge = document.getElementById('statusBadge');
+            
+            if (!data.is_active) {
+                badge.textContent = 'Bus not started';
+                badge.style.background = 'rgba(255,255,255,0.1)';
+                badge.style.color = 'white';
+                busMarker.setOpacity(0.5);
+                document.getElementById('speedVal').textContent = '--';
+                document.getElementById('accVal').textContent = '--';
+                document.getElementById('lastPingText').textContent = 'Waiting for driver to start...';
+                return;
+            }
+
+            badge.textContent = '🟢 LIVE';
+            badge.style.background = 'rgba(34,197,94,0.2)';
+            badge.style.color = '#4ade80';
+
+            const latLng = [data.latitude, data.longitude];
+            busMarker.setLatLng(latLng).setOpacity(1);
+            if (!map.getBounds().contains(latLng)) map.panTo(latLng);
+
+            document.getElementById('speedVal').textContent = data.speed_kmh ? data.speed_kmh.toFixed(1) : 0;
+            document.getElementById('accVal').textContent = data.accuracy_meters ? data.accuracy_meters.toFixed(0) : '-';
+            
+            const timeStr = data.updated_at ? new Date(data.updated_at).toLocaleTimeString() : 'Just now';
+            document.getElementById('lastPingText').textContent = `📡 Last ping: ${timeStr}`;
+        }
+
+        init();
+    </script>
+</body>
+</html>

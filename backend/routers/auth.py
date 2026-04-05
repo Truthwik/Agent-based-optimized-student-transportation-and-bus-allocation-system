@@ -4,7 +4,7 @@ import jwt
 from datetime import datetime, timedelta
 
 from ..database import get_db
-from ..models.models import Admin, Student, Bus
+from ..models.models import Admin, Student, Bus, Coordinator
 from ..models.schemas import LoginRequest, LoginResponse, ChangePasswordRequest
 from ..config import JWT_SECRET, JWT_ALGORITHM
 
@@ -59,6 +59,19 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
             password_changed=True
         )
 
+    # Try coordinator login
+    coordinator = db.query(Coordinator).filter(Coordinator.employee_id == req.username).first()
+    if coordinator and coordinator.password_hash == req.password:
+        if not coordinator.is_active:
+            raise HTTPException(status_code=403, detail="Account deactivated by admin.")
+        token = create_token({"sub": coordinator.employee_id, "role": "coordinator", "bus_id": coordinator.bus_id})
+        return LoginResponse(
+            token=token,
+            role="coordinator",
+            bus_id=coordinator.bus_id,
+            password_changed=coordinator.password_changed
+        )
+
     raise HTTPException(status_code=401, detail="Invalid ID or Password")
 
 
@@ -97,6 +110,16 @@ def change_password(
         if user.driver_phone != req.old_password:
             raise HTTPException(status_code=400, detail="[Auth] Current password is incorrect")
         user.driver_phone = req.new_password
+        db.commit()
+        return {"message": "Password changed successfully"}
+    elif role == "coordinator":
+        user = db.query(Coordinator).filter(Coordinator.employee_id == user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="[Auth] Coordinator not found")
+        if user.password_hash != req.old_password:
+            raise HTTPException(status_code=400, detail="[Auth] Current password is incorrect")
+        user.password_hash = req.new_password
+        user.password_changed = True
         db.commit()
         return {"message": "Password changed successfully"}
     else:

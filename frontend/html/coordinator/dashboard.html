@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Coordinator Dashboard | BVRIT Smart Bus</title>
+    <link rel="stylesheet" href="/static/css/style.css?v=logo-theme-1">
+    <style>
+        .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
+        .stat-card { background: var(--glass-bg); border: 1px solid var(--glass-border); padding: 16px; border-radius: 12px; text-align: center; }
+        .stat-val { font-size: 2rem; font-weight: 700; margin-top: 8px; color: var(--primary-accent); }
+    </style>
+</head>
+<body>
+    <div class="page-wrapper">
+        <nav class="navbar">
+            <div class="container">
+                <div class="navbar-brand">
+                    <img class="logo-img" src="/static/img/logo.png" alt="Logo" width="32" height="32">
+                    Coordinator Portal
+                </div>
+                <ul class="navbar-links" id="navLinks">
+                    <li><a href="/static/html/coordinator/dashboard.html" class="active">Dashboard</a></li>
+                    <li><a href="/static/html/coordinator/students.html">Students</a></li>
+                    <li><a href="/static/html/coordinator/tracking.html">Live Tracking</a></li>
+                    <li><a href="/static/html/coordinator/route.html">Route</a></li>
+                    <li><a href="/static/html/coordinator/daypass.html">Day Pass</a></li>
+                    <li><a href="/static/html/coordinator/profile.html">Profile</a></li>
+                    <li><a href="#" class="btn-logout" onclick="logout()">Logout</a></li>
+                </ul>
+            </div>
+        </nav>
+
+        <div class="dashboard-content">
+            <div class="container">
+                <div class="page-header slide-up">
+                    <h1>Dashboard</h1>
+                    <p class="subtitle" id="coordSubtitle">Loading...</p>
+                </div>
+
+                <div class="stat-grid slide-up" style="animation-delay: 0.1s;">
+                    <div class="stat-card">
+                        <div style="color:var(--text-secondary); font-size:0.9rem">Total Students</div>
+                        <div class="stat-val" id="statTotal">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <div style="color:var(--text-secondary); font-size:0.9rem">Day Pass Today</div>
+                        <div class="stat-val" id="statDaypass">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <div style="color:var(--text-secondary); font-size:0.9rem">Available Seats</div>
+                        <div class="stat-val" id="statAvail">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <div style="color:var(--text-secondary); font-size:0.9rem">Occupancy</div>
+                        <div class="stat-val" id="statOcc">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <div style="color:var(--text-secondary); font-size:0.9rem">Bus Status</div>
+                        <div class="stat-val" id="statLive" style="font-size:1.5rem; margin-top:12px;">-</div>
+                    </div>
+                    <div class="stat-card">
+                        <div style="color:var(--text-secondary); font-size:0.9rem">Open Complaints</div>
+                        <div class="stat-val" id="statComplaints">-</div>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px;">
+                    <!-- Bus Info -->
+                    <div class="glass-card slide-up" style="animation-delay: 0.2s;">
+                        <h3>🚌 Bus & Driver Info</h3>
+                        <div style="margin-top: 16px; line-height: 1.8;">
+                            <div><span style="color:var(--text-secondary)">Bus Number:</span> <strong id="busNum">-</strong></div>
+                            <div><span style="color:var(--text-secondary)">Max Capacity:</span> <strong id="busCap">-</strong></div>
+                            <div><span style="color:var(--text-secondary)">Driver Name:</span> <strong id="driverName">-</strong></div>
+                            <div><span style="color:var(--text-secondary)">Driver Phone:</span> <strong id="driverPhone">-</strong></div>
+                        </div>
+                    </div>
+
+                    <!-- Announcements Quick Access -->
+                    <div class="glass-card slide-up" style="animation-delay: 0.25s; padding: 0;">
+                        <div style="padding: 24px 24px 16px; display: flex; justify-content: space-between; align-items: center;">
+                            <h3 style="margin: 0;">📢 Announcements</h3>
+                            <a href="/static/html/coordinator/announcements.html" class="btn btn-secondary btn-sm" style="font-size: 0.75rem;">Manage All</a>
+                        </div>
+                        <div id="latestAnnouncements" style="padding: 0 24px 24px;">
+                            <div style="text-align: center; color: var(--text-secondary); padding: 10px;">Loading...</div>
+                        </div>
+                        <div style="background: rgba(59,130,246,0.05); padding: 16px 24px; border-top: 1px solid var(--glass-border);">
+                           <button onclick="window.location.href='/static/html/coordinator/announcements.html'" class="btn btn-primary" style="width: 100%; font-size: 0.85rem;">+ Create New Announcement</button>
+                        </div>
+                    </div>
+
+                    <!-- Open Complaints Quick View -->
+                    <div class="glass-card slide-up" style="animation-delay: 0.3s; padding: 0;">
+                        <div style="padding: 24px 24px 16px; display: flex; justify-content: space-between; align-items: center;">
+                            <h3 style="margin: 0;">🔔 Latest Open Complaints</h3>
+                            <a href="/static/html/coordinator/complaints.html" class="btn btn-secondary btn-sm" style="font-size: 0.75rem;">View All</a>
+                        </div>
+                        <div id="latestComplaints" style="padding: 0 24px 24px;">Loading...</div>
+                        <div style="background: rgba(239,68,68,0.05); padding: 16px 24px; border-top: 1px solid var(--glass-border); text-align: center;">
+                            <span style="color: var(--text-secondary); font-size: 0.8rem;">You have <strong id="complaintCountText" style="color: #ef4444;">0</strong> pending issues</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const token = localStorage.getItem('token');
+        if (!token || localStorage.getItem('role') !== 'coordinator') window.location.href = '/static/html/login.html';
+        const headers = { 'Authorization': `Bearer ${token}` };
+
+        async function init() {
+            try {
+                const res = await fetch('/coordinator/me', { headers });
+                if (!res.ok) {
+                    if(res.status === 401) logout();
+                    throw new Error("Unauthorized");
+                }
+                const data = await res.json();
+                
+                // Set text
+                document.getElementById('coordSubtitle').textContent = `${data.coordinator.name} • ${data.coordinator.employee_id} • Bus ${data.bus.bus_number}`;
+                
+                // Set stats
+                document.getElementById('statTotal').textContent = data.summary.total_students_allocated;
+                document.getElementById('statDaypass').textContent = data.summary.daypass_students_today;
+                document.getElementById('statAvail').textContent = data.summary.available_seats;
+                document.getElementById('statOcc').textContent = `${data.summary.occupancy_percent}%`;
+                document.getElementById('statLive').innerHTML = data.summary.bus_is_live ? '<span style="color:#22c55e">🟢 LIVE</span>' : '<span style="color:#94a3b8">🅿️ Parked</span>';
+                document.getElementById('statComplaints').textContent = data.summary.open_complaints;
+                if(data.summary.open_complaints > 0) document.getElementById('statComplaints').style.color = '#ef4444';
+
+                // Set bus info
+                document.getElementById('busNum').textContent = data.bus.bus_number;
+                document.getElementById('busCap').textContent = data.bus.max_capacity;
+                document.getElementById('driverName').textContent = data.bus.driver_name || 'N/A';
+                document.getElementById('driverPhone').textContent = data.bus.driver_phone || 'N/A';
+
+                document.getElementById('complaintCountText').textContent = data.summary.open_complaints;
+
+                loadLatestComplaints();
+                loadLatestAnnouncements();
+            } catch (err) { console.error(err); }
+        }
+
+        async function loadLatestComplaints() {
+            try {
+                const res = await fetch('/coordinator/complaints?status=open', { headers });
+                const complaints = await res.json();
+                const container = document.getElementById('latestComplaints');
+                
+                if (complaints.length === 0) {
+                    container.innerHTML = '<div style="color:var(--text-secondary); text-align:center; padding: 20px 0;">No open complaints</div>';
+                    return;
+                }
+
+                container.innerHTML = complaints.slice(0, 2).map(c => `
+                    <div style="padding: 12px; background: rgba(0,0,0,0.1); border-radius: 8px; margin-bottom: 8px; border-left: 3px solid #ef4444;">
+                        <div style="display:flex; justify-content:space-between; margin-bottom:4px">
+                            <strong style="color:var(--text-primary); font-size:0.9rem;">${c.student_name}</strong>
+                            <small style="color:var(--text-secondary)">${c.category}</small>
+                        </div>
+                        <p style="margin:0; font-size:0.85rem; color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">"${c.description}"</p>
+                    </div>
+                `).join('');
+            } catch (err) {}
+        }
+
+        async function loadLatestAnnouncements() {
+            try {
+                const res = await fetch('/coordinator/announcements', { headers });
+                const announcements = await res.json();
+                const container = document.getElementById('latestAnnouncements');
+                
+                if (announcements.length === 0) {
+                    container.innerHTML = '<div style="color:var(--text-secondary); text-align:center; padding: 20px 0; font-size: 0.85rem;">No recent announcements</div>';
+                    return;
+                }
+
+                container.innerHTML = announcements.slice(0, 2).map(a => `
+                    <div style="padding: 12px; background: rgba(0,0,0,0.1); border-radius: 8px; margin-bottom: 8px; border-left: 3px solid var(--accent-blue);">
+                        <div style="display:flex; justify-content:space-between; margin-bottom:4px">
+                            <strong style="color:var(--text-primary); font-size:0.9rem;">${a.title}</strong>
+                            <small style="color:var(--text-secondary)">${new Date(a.created_at).toLocaleDateString()}</small>
+                        </div>
+                        <p style="margin:0; font-size:0.85rem; color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${a.message}</p>
+                    </div>
+                `).join('');
+            } catch (err) {}
+        }
+
+        function logout() { localStorage.clear(); window.location.href = '/static/html/login.html'; }
+        init();
+    </script>
+</body>
+</html>

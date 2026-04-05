@@ -74,14 +74,11 @@
                     <div id="map"></div>
                 </div>
 
-                <!-- Parked State -->
-                <div id="parkedCard" class="parked-card slide-up" style="display:none;">
-                    <div style="font-size:3rem;margin-bottom:16px;">🅿️</div>
-                    <h2 style="margin-bottom:8px;">Bus is in Parking</h2>
-                    <p class="subtitle">Your bus has not started the trip yet.<br>This page will automatically update when the driver starts.</p>
-                    <div style="margin-top:20px;padding:12px 20px;background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.2);border-radius:12px;font-size:0.85rem;color:#93c5fd;">
-                        🔄 Auto-refreshing every 15 seconds...
-                    </div>
+                <!-- Parked State Overlay (Over Map) -->
+                <div id="parkedOverlay" class="parked-card" style="display:none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 1000; width: 80%; background: rgba(15,23,42,0.9); backdrop-filter: blur(8px);">
+                    <div style="font-size:2rem;margin-bottom:12px;">🚌</div>
+                    <h2 style="margin-bottom:4px; font-size: 1.2rem;">Bus not started</h2>
+                    <p class="subtitle" style="font-size: 0.9rem;">The driver hasn't started the trip yet.<br>This will update automatically.</p>
                 </div>
 
                 <!-- Info Cards (shown when live) -->
@@ -182,6 +179,12 @@
             mapInitialized = true;
             document.getElementById('mapWrapper').style.display = 'block';
             document.getElementById('infoCards').style.display = 'block';
+            
+            if (!lat || !lng) {
+                // If bus not started, center on Campus
+                lat = 17.7231;
+                lng = 78.2618;
+            }
 
             // Invalidate size after the container becomes visible
             setTimeout(() => {
@@ -218,8 +221,8 @@
 
                 if (data.is_active && data.latitude) {
                     // LIVE
-                    document.getElementById('parkedCard').style.display = 'none';
-                    document.getElementById('trackSubtitle').textContent = `Bus ${data.bus_number || busId} is actively broadcasting`;
+                    document.getElementById('parkedOverlay').style.display = 'none';
+                    document.getElementById('trackSubtitle').textContent = `Bus ${data.bus_number || busId} is active`;
 
                     initMap(data.latitude, data.longitude);
 
@@ -254,9 +257,10 @@
                         }
                     }
                 } else {
-                    // PARKED
-                    document.getElementById('parkedCard').style.display = 'block';
-                    document.getElementById('trackSubtitle').textContent = 'Bus has not started the trip yet';
+                    // BUS NOT STARTED
+                    initMap(); // Show map center on BVRIT
+                    document.getElementById('parkedOverlay').style.display = 'block';
+                    document.getElementById('trackSubtitle').textContent = 'Waiting for driver to start...';
                     document.getElementById('infoCards').style.display = 'none';
                     if (busMarker && map) { busMarker.remove(); busMarker = null; }
                 }
