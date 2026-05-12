@@ -359,7 +359,7 @@ python manual_migration.py
 uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
-The API will be available at `http://localhost:8000`
+The API will be available at `https://agent-based-optimized-student.onrender.com`
 
 ---
 
@@ -403,7 +403,7 @@ The system uses SQLAlchemy for ORM. Key models include:
 
 ### For Students
 
-1. **Login**: Navigate to `http://localhost:8000/frontend/html/login.html`
+1. **Login**: Navigate to `https://agent-based-optimized-student.onrender.com/frontend/html/login.html`
 2. **First Login**: Use credentials provided by admin (default password: `bvrit123`)
 3. **Change Password**: System forces password change on first login
 4. **Select Stop**: Choose preferred pickup location from dashboard

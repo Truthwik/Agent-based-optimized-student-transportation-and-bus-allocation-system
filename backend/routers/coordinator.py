@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import List
 import json
 import asyncio
+import dateutil.parser
 
 from backend.database import get_db
 from backend.models.models import Coordinator, Bus, Student, Allocation, DayPassBooking, Route, RouteStop, Stop, Announcement, Complaint
@@ -251,11 +252,10 @@ def get_announcements(db: Session = Depends(get_db), coordinator: Coordinator = 
 def create_announcement(announcement: AnnouncementCreate, db: Session = Depends(get_db), coordinator: Coordinator = Depends(verify_coordinator)):
     try:
         # Robust Date Parsing
-        import dateutil.parser as parser
         expires_at = None
         try:
             # Use dayfirst=True for Indian format support (DD-MM-YYYY)
-            expires_at = parser.parse(announcement.expires_at, dayfirst=True)
+            expires_at = dateutil.parser.parse(announcement.expires_at, dayfirst=True)
         except Exception as date_err:
             print(f"[Announcement Error] dateutil failed: {e if 'e' in locals() else date_err}")
             # Explicit fallbacks for common formats

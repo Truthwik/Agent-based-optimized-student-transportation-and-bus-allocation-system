@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import List
 from datetime import datetime
+import dateutil.parser
 
 from backend.database import get_db
 from backend.models.models import (
@@ -366,10 +367,9 @@ def get_admin_announcements(db: Session = Depends(get_db), admin=Depends(verify_
 @router.post("/announcements", response_model=AnnouncementResponse)
 def create_admin_announcement(announcement: AnnouncementCreate, db: Session = Depends(get_db), admin=Depends(verify_admin)):
     try:
-        import dateutil.parser as parser
         expires_at = None
         try:
-            expires_at = parser.parse(announcement.expires_at, dayfirst=True)
+            expires_at = dateutil.parser.parse(announcement.expires_at, dayfirst=True)
         except Exception as date_err:
             print(f"dateutil parse failed: {date_err}")
             date_formats = ["%d-%m-%Y %H:%M", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M", "%Y-%m-%d"]
