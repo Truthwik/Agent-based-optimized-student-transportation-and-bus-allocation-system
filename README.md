@@ -74,6 +74,29 @@ BVRIT Smart Bus is an end-to-end digital transformation of the university's tran
 
 ---
 
+## 📸 UI Screenshots
+
+### Login Portal
+<img src="frontend/img/login-portal.png" alt="Employee Portal Login" width="600">
+
+**BVRIT Smart Bus Management System** - Secure multi-role login interface supporting Student, Driver, Coordinator, and Admin credentials.
+
+---
+
+### Forced Password Change on First Login
+
+<img src="frontend/img/change-password.png" alt="Change Password Interface" width="600">
+
+**Security Feature: Forced Password Reset**  
+On first login, users are automatically redirected to a secure password change page. This ensures:
+- Default passwords (`bvrit123`) are replaced with personal, secure passwords
+- Users cannot access dashboard features until password is changed
+- Password strength validation is enforced
+- All subsequent sessions use the new credentials
+- No way to bypass this security gate - it's mandatory on first login
+
+---
+
 ## 🏗️ Architecture
 
 The system follows a **Client-Server Architecture** with clear separation of concerns:
@@ -438,6 +461,83 @@ The system uses SQLAlchemy for ORM. Key models include:
 6. **Configure Passes**: Set up day pass and yearly pass pricing
 
 ---
+
+## 📱 System Interface Gallery
+
+### Student Dashboard
+
+<img src="frontend/img/student-dashboard.png" alt="Student Dashboard" width="700">
+
+The main student hub displaying:
+- **Account Status**: Active bus service with selected pickup stop
+- **Report Issues**: Quick access to complaint management
+- **Track My Bus**: Real-time bus tracking with live location map
+- **Navigation**: Easy access to all student features via the purple header bar
+
+---
+
+### Digital Bus Pass (Day Pass Feature)
+
+<img src="frontend/img/bus-pass.png" alt="Digital Bus Pass with QR Code" width="700">
+
+**Day Pass & Yearly Pass Features**:
+- Generate QR-based digital passes instantly from the app
+- Display student information, bus allocation, and driver contact
+- Includes automatic arrival time at pickup stop
+- Eliminates need for physical paper tickets
+- Can be presented directly from phone at boarding
+- Valid for specified date/period - can be screenshotted or printed
+- Supports both day-wise and year-wise pass options
+- Integrated with Razorpay payment gateway for day pass purchases
+
+---
+
+### Select Pickup Stop & Book Day Pass
+
+<img src="frontend/img/select-stop-day-pass.png" alt="Stop Selection and Day Pass Booking" width="700">
+
+**Student Features in This Section**:
+- Browse all available pickup stops in real-time
+- View available buses for each stop for that day
+- See remaining seat availability (e.g., "1 seats left")
+- One-click booking for temporary day passes
+- Choose between booking within your assigned bus or purchasing a separate day pass
+- Route information and bus capacity displayed
+- Seamless integration with payment gateway
+
+---
+
+### Live Bus Tracking (Fleet Monitor)
+
+<img src="frontend/img/fleet-monitor.png" alt="Live Bus Tracking Map" width="700">
+
+**Real-Time Geolocation Features**:
+- Interactive Leaflet.js map showing all active buses
+- Real-time GPS coordinates from driver devices
+- Active buses counter and disconnect status monitoring
+- Click on bus markers to view route details
+- Current location pinpoint with accuracy
+- Route path visualization showing stops
+- Automatic updates every 3-5 seconds during active trips
+- Geofence alerts when bus approaches (within 0.5km)
+
+---
+
+### Admin Dashboard
+
+<img src="frontend/img/admin-dashboard.png" alt="Admin Control Panel" width="700">
+
+**Administrative Functions Available**:
+- **Manage Stops**: Add, edit, remove pickup locations with GPS coordinates
+- **Manage Buses**: Configure fleet vehicles, set capacity, add driver info
+- **View Students**: List all enrolled students and their allocations
+- **Generate Allocation**: Run the optimization engine to create routes
+- **View Routes**: See generated routes with stop ordering
+- **Account Settings**: Manage admin profile and password
+
+---
+
+
 
 ## 📡 API Documentation
 
