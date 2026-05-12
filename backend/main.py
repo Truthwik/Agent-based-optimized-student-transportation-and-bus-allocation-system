@@ -12,7 +12,7 @@ from .routers import auth, admin, student, driver, tracking, coordinator
 
 logger = logging.getLogger(__name__)
 
-# Create all tables when DB is reachable (MySQL must be running)
+# Create all tables when DB is reachable (PostgreSQL must be running)
 try:
     Base.metadata.create_all(bind=engine)
 except Exception as exc:
@@ -23,12 +23,12 @@ app = FastAPI(title="BVRIT Smart Bus Management System", version="1.0.0")
 
 @app.exception_handler(OperationalError)
 async def database_operational_error_handler(request: Request, exc: OperationalError):
-    """Return JSON instead of HTML when MySQL is down or misconfigured (login/API use DB)."""
+    """Return JSON instead of HTML when PostgreSQL is down or misconfigured (login/API use DB)."""
     logger.warning("Database operational error on %s: %s", request.url.path, exc)
     return JSONResponse(
         status_code=503,
         content={
-            "detail": "Database unavailable. Start MySQL (e.g. Windows service MYSQL80), then restart Uvicorn. Check .env DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME."
+            "detail": "Database unavailable. Ensure PostgreSQL is running (port 5432). Check .env DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME, DATABASE_URL."
         },
     )
 

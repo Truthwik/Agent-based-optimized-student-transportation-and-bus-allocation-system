@@ -79,7 +79,7 @@
             } catch (err) {
                 alert.className = 'alert alert-error show';
                 alert.textContent =
-                    'Cannot reach the server. Start MySQL, then run: python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000';
+                    'Cannot reach the server. Ensure PostgreSQL is running (port 5432), then run: python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000';
                 return;
             }
 
@@ -93,7 +93,7 @@
                 alert.textContent =
                     'Non-JSON response (HTTP ' +
                     res.status +
-                    '). Often: MySQL off, wrong port, or another app on :8000. ' +
+                    '). Often: PostgreSQL not running (port 5432), wrong port, or another app on :8000. ' +
                     (hint ? 'Preview: ' + hint : '');
                 return;
             }

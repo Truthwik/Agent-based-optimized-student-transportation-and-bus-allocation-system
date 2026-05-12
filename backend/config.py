@@ -8,12 +8,16 @@ load_dotenv(dotenv_path=env_path)
 
 # Database
 DB_HOST = os.getenv("DB_HOST", "localhost")
-DB_PORT = os.getenv("DB_PORT", "3306")
-DB_USER = os.getenv("DB_USER", "root")
-DB_PASSWORD = os.getenv("DB_PASSWORD", "")
-DB_NAME = os.getenv("DB_NAME", "bvrit_bus_db")
+DB_PORT = os.getenv("DB_PORT", "5432")
+DB_USER = os.getenv("DB_USER", "postgres")
+DB_PASSWORD = os.getenv("DB_PASSWORD", "bvrit")
+DB_NAME = os.getenv("DB_NAME", "bvrit_transport")
 
-DATABASE_URL = f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+# Prefer the explicit DATABASE_URL from .env; fall back to constructing from parts
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    f"postgresql+psycopg2://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}",
+)
 
 # JWT
 JWT_SECRET = os.getenv("JWT_SECRET", "default_secret")

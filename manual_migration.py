@@ -28,7 +28,7 @@ def migrate():
         try:
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS day_pass_bookings (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    id SERIAL PRIMARY KEY,
                     student_id VARCHAR(20) NOT NULL,
                     bus_id INT NOT NULL,
                     stop_id INT NOT NULL,
@@ -51,11 +51,11 @@ def migrate():
         try:
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS bus_daily_capacity (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    id SERIAL PRIMARY KEY,
                     bus_id INT NOT NULL,
                     travel_date VARCHAR(10) NOT NULL,
                     booked_seats INT DEFAULT 0,
-                    UNIQUE KEY unique_bus_date (bus_id, travel_date),
+                    UNIQUE (bus_id, travel_date),
                     FOREIGN KEY (bus_id) REFERENCES buses(bus_id)
                 )
             """))

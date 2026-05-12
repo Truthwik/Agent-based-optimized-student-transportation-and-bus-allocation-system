@@ -15,7 +15,8 @@ import math
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from backend.database import SessionLocal, engine
+from backend.database import SessionLocal, engine, Base
+from backend.models import models as _models_module  # noqa: F401 — ensures all models are registered
 from backend.models.models import Route, RouteStop, Stop
 from backend.config import (
     CAMPUS_LAT,
@@ -83,15 +84,29 @@ def compute_departure_times(rss, stop_map, bus_id):
 
     return [mins_to_display(int(round(m))) for m in departure_minutes]
 
+# ─── Step 0: Create all tables (safe on fresh PostgreSQL DB) ──────────────────
+
+def create_all_tables():
+    """
+    Creates every table defined in the SQLAlchemy models if it doesn't exist.
+    On a brand-new PostgreSQL database this is required before any ALTER/backfill.
+    """
+    print("[setup] Creating all tables if not present...")
+    Base.metadata.create_all(bind=engine)
+    print("[setup] Tables ready.")
+
 
 # ─── Step 1: ALTER TABLE if column is missing ─────────────────────────────────
 
 def ensure_column_exists():
+    """
+    Adds scheduled_departure to route_stops if it was missing (older deployments).
+    On a fresh DB this is a no-op because create_all already added it.
+    """
     with engine.connect() as conn:
-        # Check if the column already exists
         result = conn.execute(text(
             "SELECT COUNT(*) FROM information_schema.columns "
-            "WHERE table_schema = DATABASE() "
+            "WHERE table_catalog = current_database() "
             "AND table_name = 'route_stops' "
             "AND column_name = 'scheduled_departure'"
         ))
@@ -104,7 +119,7 @@ def ensure_column_exists():
             conn.commit()
             print("[migrate] Column added successfully.")
         else:
-            print("[migrate] Column 'scheduled_departure' already exists.")
+            print("[migrate] Column 'scheduled_departure' already exists — nothing to do.")
 
 
 # ─── Step 2: Backfill NULL rows ───────────────────────────────────────────────
@@ -167,7 +182,15 @@ def backfill():
 
 if __name__ == "__main__":
     print("\n=== BVRIT Bus — route_stops Migration & Backfill ===\n")
+
+    # Step 0: ensure all tables exist in PostgreSQL
+    create_all_tables()
+
+    # Step 1: ensure scheduled_departure column exists (older deployments)
+    print()
     ensure_column_exists()
+
+    # Step 2: fill NULL scheduled_departure values
     print("\nBackfilling departure times...\n")
     backfill()
     print("\nDone. Restart your FastAPI server and check the bus pass page.")

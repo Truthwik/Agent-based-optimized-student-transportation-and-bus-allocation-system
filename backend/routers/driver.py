@@ -64,7 +64,7 @@ def update_location(data: LocationUpdate, driver=Depends(get_current_driver), db
     # Update store (Redis if available, else in-memory)
     update_bus_location(bus_id, location_data)
 
-    # Increment ping count, persist to MySQL every 4th ping (~32s)
+    # Increment ping count, persist to PostgreSQL every 4th ping (~32s)
     count = _ping_counts.get(bus_id, 0) + 1
     _ping_counts[bus_id] = count
 
