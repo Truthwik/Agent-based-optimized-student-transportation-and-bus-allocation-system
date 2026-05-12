@@ -872,36 +872,6 @@ This project is licensed under the **MIT License**. See the [LICENSE](LICENSE) f
 
 ---
 
-## 📞 Support & Contact
-
-For questions or support:
-- **Email**: support@bvrit-bus-optimizer.com
-- **Documentation**: See [project_details.md](project_details.md) for technical deep-dive
-- **Issues**: Open an issue on GitHub
-- **Discussion**: Join our community discussions forum
-
----
-
-## 🗺️ Roadmap
-
-### Version 2.0 (Planned)
-- [ ] Mobile app (React Native/Flutter)
-- [ ] SMS/WhatsApp notifications
-- [ ] Predictive maintenance alerts
-- [ ] Payment gateway integration
-- [ ] Machine learning route optimization
-- [ ] Multi-language support
-
-### Version 1.5 (Current)
-- [x] Core allocation engine
-- [x] Real-time tracking
-- [x] Digital bus passes
-- [x] Complaint system
-- [x] Admin dashboard
-- [x] Multi-role authentication
-
----
-
 **Last Updated**: May 2026  
 **Version**: 1.0  
 **Maintainers**: BVRIT Development Team
